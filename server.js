@@ -18,13 +18,30 @@ const client = twilio(accountSid, authToken);
 const { generateFollowUpQuestion } = require('./medsek-chat');
 const scheduledCalls = [];
 
-// Endpoint to make a call
+app.post('/voice', (req, res) => {
+    const twiml = new twilio.twiml.VoiceResponse();
+    
+    twiml.say({ voice: 'alice' }, 'Hello world!');
+    
+    res.type('text/xml');
+    res.send(twiml.toString());
+});
+
+
 app.post('/make-call', async (req, res) => {
     const { phoneNumber } = req.body;
     if (!phoneNumber) {
         return res.status(400).json({ error: 'Phone number is required' });
-    } else{
-        makeTwilioCall(phoneNumber);
+    } else {
+        try {
+            const result = await makeTwilioCall(phoneNumber);
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({ 
+                error: 'Failed to initiate call',
+                details: error.message 
+            });
+        }
     }
 });
 
@@ -140,24 +157,29 @@ app.get('/scheduled-calls', (req, res) => {
 
 async function makeTwilioCall(phoneNumber){
     try {
+        // You need to get your server's public URL
+        // For local testing with ngrok: http://YOUR_NGROK_URL/voice
+        // For production: https://your-domain.com/voice
+        const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
+        
         const call = await client.calls.create({
-            url: 'http://demo.twilio.com/docs/voice.xml', // TwiML URL for what to say
-            to: phoneNumber,
-            from: twilioPhoneNumber
+            url: `${serverUrl}/voice`,  // This tells Twilio what to say
+            to: phoneNumber,             // Who to call
+            from: twilioPhoneNumber      // Your Twilio number
         });
         
-        res.json({ 
+        console.log(`Call initiated: ${call.sid}`);
+        
+        return { 
             success: true, 
             callSid: call.sid,
-            message: 'Call initiated successfully'
-        });
+            message: 'Call initiated successfully - recipient will hear "Hello world!"'
+        };
     } catch (error) {
         console.error('Error making call:', error);
-        res.status(500).json({ 
-            error: 'Failed to initiate call',
-            details: error.message 
-        });
+        throw error;
     }
+
 }
 
 app.listen(port, () => {
