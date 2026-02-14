@@ -1,10 +1,29 @@
 const express = require('express');
 const twilio = require('twilio');
 const cron = require('node-cron');  //node-cron for scheduling
+const { ChromaClient } = require('chromadb');
 require('dotenv').config();
 
 const app = express();
 const port = 3000;
+
+// ChromaDB for persisting transcripts
+const chroma = new ChromaClient({ path: process.env.CHROMA_PATH || 'http://localhost:8000' });
+let transcriptCollection;
+
+async function initChroma() {
+    try {
+        transcriptCollection = await chroma.getOrCreateCollection({
+            name: 'call_transcripts',
+            metadata: { 'hnsw:space': 'cosine' }
+        });
+        console.log('ChromaDB ready (call_transcripts)');
+    } catch (err) {
+        console.warn('ChromaDB not available, transcripts will not be persisted:', err.message);
+        transcriptCollection = null;
+    }
+}
+initChroma();
 
 // Middleware
 app.use(express.json());
@@ -102,7 +121,28 @@ app.post('/handle-speech', async (req, res) => {
     console.log(`\n--- Full Transcript for ${callSid} ---`);
     console.log(transcriptString);
     console.log('--- End Transcript ---\n');
-    
+
+    // Save transcript to ChromaDB (each turn = updated full transcript)
+    if (transcriptCollection && transcriptString) {
+        try {
+            const id = `transcript_${callSid}_${Date.now()}`;
+            const created_at = new Date().toISOString();
+            await transcriptCollection.add({
+                ids: [id],
+                documents: [transcriptString],
+                metadatas: [{
+                    callSid,
+                    created_at,
+                    created_at_ts: Date.now(),
+                    turn_count: transcript.length
+                }]
+            });
+            console.log(`[${callSid}] Saved transcript to ChromaDB (${transcript.length} turns)`);
+        } catch (err) {
+            console.warn('ChromaDB save failed:', err.message);
+        }
+    }
+
     try {
         // Get AI response based on full conversation
         const aiResponse = await generateFollowUpQuestion(transcriptString);
