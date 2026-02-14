@@ -15,6 +15,7 @@ const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
 const client = twilio(accountSid, authToken);
+const { generateFollowUpQuestion } = require('./medsek-chat');
 
 // Endpoint to make a call
 app.post('/make-call', async (req, res) => {
@@ -40,6 +41,30 @@ app.post('/make-call', async (req, res) => {
         console.error('Error making call:', error);
         res.status(500).json({ 
             error: 'Failed to initiate call',
+            details: error.message 
+        });
+    }
+});
+
+// Get AI follow-up question (call the module)
+app.post('/get-followup', async (req, res) => {
+    const { query } = req.body;
+    
+    if (!query) {
+        return res.status(400).json({ error: 'Query is required' });
+    }
+    
+    try {
+        const followUpQuestion = await generateFollowUpQuestion(query);
+        
+        res.json({ 
+            success: true,
+            followUpQuestion: followUpQuestion
+        });
+    } catch (error) {
+        console.error('Error generating follow-up:', error);
+        res.status(500).json({ 
+            error: 'Failed to generate follow-up question',
             details: error.message 
         });
     }

@@ -93,3 +93,39 @@ button:disabled {
     background-color: #d1ecf1;
     color: #0c5460;
 }
+
+/*AI FOLLOW UP STUFF*/
+
+#aiResponse{
+    color: black;
+    background-color: transparent;
+    font-size: large;
+}
+.ai-section {
+    margin-top: 30px;
+    padding-top: 30px;
+    border-top: 2px solid #eee;
+}
+
+.ai-section h2 {
+    color: #333;
+    font-size: 1.3em;
+    margin-bottom: 15px;
+}
+
+textarea {
+    width: 100%;
+    padding: 15px;
+    font-size: 16px;
+    border: 2px solid #ddd;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    min-height: 80px;
+    font-family: inherit;
+    resize: vertical;
+}
+
+textarea:focus {
+    outline: none;
+    border-color: #667eea;
+}
