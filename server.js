@@ -36,7 +36,7 @@ const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
 const client = twilio(accountSid, authToken);
-const { generateFollowUpQuestion } = require('./medsek-chat');
+const { generateFollowUpQuestion, extractKeywordsFromTranscript } = require('./medsek-chat');
 const scheduledCalls = [];
 
 // Store conversation transcripts by CallSid
@@ -122,25 +122,30 @@ app.post('/handle-speech', async (req, res) => {
     console.log(transcriptString);
     console.log('--- End Transcript ---\n');
 
-    // Save transcript to ChromaDB (each turn = updated full transcript)
+    // Save transcript to ChromaDB in background (async, does not block follow-up question)
     if (transcriptCollection && transcriptString) {
-        try {
-            const id = `transcript_${callSid}_${Date.now()}`;
-            const created_at = new Date().toISOString();
-            await transcriptCollection.add({
-                ids: [id],
-                documents: [transcriptString],
-                metadatas: [{
-                    callSid,
-                    created_at,
-                    created_at_ts: Date.now(),
-                    turn_count: transcript.length
-                }]
-            });
-            console.log(`[${callSid}] Saved transcript to ChromaDB (${transcript.length} turns)`);
-        } catch (err) {
-            console.warn('ChromaDB save failed:', err.message);
-        }
+        const transcriptLen = transcript.length;
+        (async () => {
+            try {
+                const keywords = await extractKeywordsFromTranscript(transcriptString);
+                const id = `transcript_${callSid}_${Date.now()}`;
+                const created_at = new Date().toISOString();
+                await transcriptCollection.add({
+                    ids: [id],
+                    documents: [transcriptString],
+                    metadatas: [{
+                        callSid,
+                        created_at,
+                        created_at_ts: Date.now(),
+                        turn_count: transcriptLen,
+                        keywords: keywords.join(', ')
+                    }]
+                });
+                console.log(`[${callSid}] Saved transcript to ChromaDB (${transcriptLen} turns, keywords: ${keywords.join(', ') || 'none'})`);
+            } catch (err) {
+                console.warn('ChromaDB save failed:', err.message);
+            }
+        })();
     }
 
     try {

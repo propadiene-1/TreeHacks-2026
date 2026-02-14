@@ -71,7 +71,43 @@ async function analyzeTranscript(transcript) {
     }
 }
 
+/**
+ * Extract health/symptom keywords from a conversation transcript
+ * @param {string} transcript - Full conversation transcript
+ * @returns {Promise<string[]>} - Array of keyword strings
+ */
+async function extractKeywordsFromTranscript(transcript) {
+    try {
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+                {
+                    role: "system",
+                    content: "Extract health/symptom keywords from the conversation (e.g. pain, fatigue, headache, sleep, anxiety). Reply with only a JSON array of strings, e.g. [\"pain\",\"fatigue\"]."
+                },
+                {
+                    role: "user",
+                    content: transcript
+                }
+            ],
+            max_tokens: 150,
+            temperature: 0.2
+        });
+
+        const content = response.choices[0].message.content.trim();
+        const parsed = JSON.parse(content);
+        if (Array.isArray(parsed) && parsed.length) {
+            return parsed.filter(Boolean).map(String);
+        }
+        return [];
+    } catch (error) {
+        console.error('OpenAI keyword extraction error:', error);
+        return [];
+    }
+}
+
 module.exports = {
-    generateFollowUpQuestion
+    generateFollowUpQuestion,
+    extractKeywordsFromTranscript
     //analyzeTranscript
 };
