@@ -20,29 +20,10 @@ const { generateFollowUpQuestion } = require('./medsek-chat');
 // Endpoint to make a call
 app.post('/make-call', async (req, res) => {
     const { phoneNumber } = req.body;
-    
     if (!phoneNumber) {
         return res.status(400).json({ error: 'Phone number is required' });
-    }
-    
-    try {
-        const call = await client.calls.create({
-            url: 'http://demo.twilio.com/docs/voice.xml', // TwiML URL for what to say
-            to: phoneNumber,
-            from: twilioPhoneNumber
-        });
-        
-        res.json({ 
-            success: true, 
-            callSid: call.sid,
-            message: 'Call initiated successfully'
-        });
-    } catch (error) {
-        console.error('Error making call:', error);
-        res.status(500).json({ 
-            error: 'Failed to initiate call',
-            details: error.message 
-        });
+    } else{
+        makeTwilioCall(phoneNumber);
     }
 });
 
@@ -69,6 +50,28 @@ app.post('/get-followup', async (req, res) => {
         });
     }
 });
+
+async function makeTwilioCall(phoneNumber){
+    try {
+        const call = await client.calls.create({
+            url: 'http://demo.twilio.com/docs/voice.xml', // TwiML URL for what to say
+            to: phoneNumber,
+            from: twilioPhoneNumber
+        });
+        
+        res.json({ 
+            success: true, 
+            callSid: call.sid,
+            message: 'Call initiated successfully'
+        });
+    } catch (error) {
+        console.error('Error making call:', error);
+        res.status(500).json({ 
+            error: 'Failed to initiate call',
+            details: error.message 
+        });
+    }
+}
 
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
