@@ -1,5 +1,6 @@
 const express = require('express');
 const twilio = require('twilio');
+const cron = require('node-cron');  //node-cron for scheduling
 require('dotenv').config();
 
 const app = express();
@@ -56,7 +57,7 @@ app.post('/get-followup', async (req, res) => {
     try {
         const followUpQuestion = await generateFollowUpQuestion(query);
         
-        res.json({ 
+        res.json({
             success: true,
             followUpQuestion: followUpQuestion
         });
@@ -70,55 +71,58 @@ app.post('/get-followup', async (req, res) => {
 });
 
 // Schedule one-time call
+// Request format-- phoneNumber: '[number]', scheduledTime: '[YYYY-MM-DDTHH:MM:SS]' (ISO format)
 app.post('/schedule-call', (req, res) => {
     const { phoneNumber, scheduledTime } = req.body;
     const scheduledDate = new Date(scheduledTime);
-    
     const cronTime = `${scheduledDate.getMinutes()} ${scheduledDate.getHours()} ${scheduledDate.getDate()} ${scheduledDate.getMonth() + 1} *`;
     
     const task = cron.schedule(cronTime, async () => {
         await makeTwilioCall(phoneNumber);
         task.stop();
     });
+
+    const callId = `one-time-${Date.now()}`;
     
+    scheduledCalls.push({
+        id: callId,
+        phoneNumber,
+        task
+    });
+
     res.json({ success: true, message: 'Call scheduled' });
 });
 
 // Schedule recurring calls
+// Request format-- phoneNumber: '[number]', frequency: 'daily' or 'weekly', time: 'HH:MM'
 app.post('/schedule-recurring', (req, res) => {
-    const { phoneNumber, frequency, time } = req.body;
+    const { phoneNumber, frequency, time='09:00' } = req.body; //default to 09:00?
     
     if (!phoneNumber || !frequency) {
         return res.status(400).json({ error: 'Phone number and frequency required' });
     }
     
     try {
-        //const callId = scheduleRecurringCall(phoneNumber, frequency, time);
-
         const [hours, minutes] = time.split(':');
 
-        let cronExpression;
+        let cronExpression; //hold cron string
     
-        //basically if-else
-        switch(frequency) {
-            case 'hourly':
-                cronExpression = '0 * * * *';
-                break;
+        switch(frequency) { //basically if-else
             case 'daily':
                 cronExpression = `${minutes} ${hours} * * *`;
                 break;
             case 'weekly':
-                cronExpression = `${minutes} ${hours} * * 1`;  // Every Monday
+                cronExpression = `${minutes} ${hours} * * 1`;  //default to every monday
                 break;
             default:
-                return res.status(400).json({ error: 'Invalid frequency. Use: hourly, daily, or weekly' });
+                return res.status(400).json({ error: 'Invalid frequency. Use: daily or weekly' });
         }
 
         const task = cron.schedule(cronExpression, async () => {
             console.log(`Making recurring call to ${phoneNumber}`);
             
             try {
-                const result = await makeTwilioCall(phoneNumber);
+                const result = await makeTwilioCall(phoneNumber);   //make calls on schedule
                 console.log(`Recurring call initiated: ${result.callSid}`);
             } catch (error) {
                 console.error(`Failed to make recurring call: ${error.message}`);
@@ -127,7 +131,8 @@ app.post('/schedule-recurring', (req, res) => {
 
         //recurring const containing info
         const callId = `recurring-${Date.now()}`;
-            scheduledCalls.push({
+
+        scheduledCalls.push({
             id: callId,
             phoneNumber,
             frequency,
@@ -151,7 +156,13 @@ app.post('/schedule-recurring', (req, res) => {
 
 // Get all scheduled calls
 app.get('/scheduled-calls', (req, res) => {
-    const calls = getScheduledCalls();
+    const calls = scheduledCalls.map(({ id, phoneNumber, scheduledTime, frequency, time }) => ({
+        id,
+        phoneNumber,
+        scheduledTime,
+        frequency,
+        time
+    }));
     res.json({ calls });
 });
 
