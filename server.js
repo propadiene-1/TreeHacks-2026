@@ -8,9 +8,10 @@ const port = 3000;
 
 // Middleware
 app.use(express.json());
-app.use(express.static('public')); // Serve static files
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public'));
 
-// Twilio credentials (store these in .env file)
+// Twilio credentials
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
@@ -19,16 +20,174 @@ const client = twilio(accountSid, authToken);
 const { generateFollowUpQuestion } = require('./medsek-chat');
 const scheduledCalls = [];
 
+// Store conversation transcripts by CallSid
+const conversations = new Map();
+
+// Function to get random greeting (keeping this as fallback)
+function getRandomGreeting() {
+    const greetings = ["Hi", "Hello", "Hola", "Bonjour"];
+    const randomIndex = Math.floor(Math.random() * greetings.length);
+    return greetings[randomIndex];
+}
+
+// Initial voice endpoint - starts the conversation
 app.post('/voice', (req, res) => {
     const twiml = new twilio.twiml.VoiceResponse();
+    const callSid = req.body.CallSid;
     
-    twiml.say({ voice: 'alice' }, 'Hello world!');
+    // Initialize conversation for this call
+    if (!conversations.has(callSid)) {
+        conversations.set(callSid, []);
+        console.log(`New call started: ${callSid}`);
+    }
+    
+    // Say initial greeting
+    const initialGreeting = "Hello! I'm here to chat with you. What would you like to talk about?";
+    twiml.say({ voice: 'alice' }, initialGreeting);
+    
+    // Add to transcript
+    conversations.get(callSid).push({
+        speaker: 'AI',
+        message: initialGreeting,
+        timestamp: new Date().toISOString()
+    });
+    
+    // Gather user's speech response
+    const gather = twiml.gather({
+        input: 'speech',
+        action: '/handle-speech',
+        method: 'POST',
+        speechTimeout: 'auto',
+        language: 'en-US'
+    });
+    
+    // If user doesn't say anything, prompt them
+    twiml.say({ voice: 'alice' }, 'Are you still there?');
+    
+    // Redirect back to keep the conversation going
+    twiml.redirect('/voice');
     
     res.type('text/xml');
     res.send(twiml.toString());
 });
 
+// Handle user's speech and respond with AI
+app.post('/handle-speech', async (req, res) => {
+    const twiml = new twilio.twiml.VoiceResponse();
+    const userSpeech = req.body.SpeechResult;
+    const callSid = req.body.CallSid;
+    
+    console.log(`[${callSid}] User said: ${userSpeech}`);
+    
+    // Initialize conversation if it doesn't exist (shouldn't happen, but safety check)
+    if (!conversations.has(callSid)) {
+        conversations.set(callSid, []);
+    }
+    
+    // Add user's speech to transcript
+    conversations.get(callSid).push({
+        speaker: 'User',
+        message: userSpeech,
+        timestamp: new Date().toISOString()
+    });
+    
+    // Get the full conversation transcript
+    const transcript = conversations.get(callSid);
+    
+    // Format transcript as a string for the AI
+    const transcriptString = transcript.map(entry => 
+        `${entry.speaker}: ${entry.message}`
+    ).join('\n');
+    
+    console.log(`\n--- Full Transcript for ${callSid} ---`);
+    console.log(transcriptString);
+    console.log('--- End Transcript ---\n');
+    
+    try {
+        // Get AI response based on full conversation
+        const aiResponse = await generateFollowUpQuestion(transcriptString);
+        
+        console.log(`[${callSid}] AI responds: ${aiResponse}`);
+        
+        // Add AI response to transcript
+        conversations.get(callSid).push({
+            speaker: 'AI',
+            message: aiResponse,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Say the AI response
+        twiml.say({ voice: 'alice' }, aiResponse);
+        
+    } catch (error) {
+        console.error('Error getting AI response:', error);
+        
+        // Fallback to random greeting if AI fails
+        const fallbackResponse = getRandomGreeting();
+        twiml.say({ voice: 'alice' }, fallbackResponse);
+        
+        conversations.get(callSid).push({
+            speaker: 'AI',
+            message: fallbackResponse + ' (fallback)',
+            timestamp: new Date().toISOString()
+        });
+    }
+    
+    // Gather user's next response
+    const gather = twiml.gather({
+        input: 'speech',
+        action: '/handle-speech',
+        method: 'POST',
+        speechTimeout: 'auto',
+        language: 'en-US'
+    });
+    
+    // If user doesn't respond, prompt them
+    twiml.say({ voice: 'alice' }, 'I am listening. Please continue.');
+    
+    // Keep looping
+    twiml.redirect('/handle-speech');
+    
+    res.type('text/xml');
+    res.send(twiml.toString());
+});
 
+// Optional: Endpoint to view conversation transcript
+app.get('/transcript/:callSid', (req, res) => {
+    const callSid = req.params.callSid;
+    
+    if (conversations.has(callSid)) {
+        const transcript = conversations.get(callSid);
+        
+        // Format as HTML for easy viewing
+        let html = `<h1>Transcript for Call: ${callSid}</h1>`;
+        html += '<div style="font-family: monospace; white-space: pre-wrap;">';
+        
+        transcript.forEach(entry => {
+            const time = new Date(entry.timestamp).toLocaleTimeString();
+            html += `<p><strong>[${time}] ${entry.speaker}:</strong> ${entry.message}</p>`;
+        });
+        
+        html += '</div>';
+        
+        res.send(html);
+    } else {
+        res.status(404).json({ error: 'Transcript not found' });
+    }
+});
+
+// Optional: Endpoint to view all active conversations
+app.get('/transcripts', (req, res) => {
+    const allTranscripts = {};
+    
+    conversations.forEach((transcript, callSid) => {
+        allTranscripts[callSid] = transcript;
+    });
+    
+    res.json(allTranscripts);
+});
+
+// Endpoint to make a call
 app.post('/make-call', async (req, res) => {
     const { phoneNumber } = req.body;
     if (!phoneNumber) {
@@ -46,7 +205,7 @@ app.post('/make-call', async (req, res) => {
     }
 });
 
-// Get AI follow-up question (call the module)
+// Get AI follow-up question (keeping this for web interface)
 app.post('/get-followup', async (req, res) => {
     const { query } = req.body;
     
@@ -166,17 +325,14 @@ app.get('/scheduled-calls', (req, res) => {
     res.json({ calls });
 });
 
-async function makeTwilioCall(phoneNumber){
+async function makeTwilioCall(phoneNumber) {
     try {
-        // You need to get your server's public URL
-        // For local testing with ngrok: http://YOUR_NGROK_URL/voice
-        // For production: https://your-domain.com/voice
         const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
         
         const call = await client.calls.create({
-            url: `${serverUrl}/voice`,  // This tells Twilio what to say
-            to: phoneNumber,             // Who to call
-            from: twilioPhoneNumber      // Your Twilio number
+            url: `${serverUrl}/voice`,
+            to: phoneNumber,
+            from: twilioPhoneNumber
         });
         
         console.log(`Call initiated: ${call.sid}`);
@@ -184,13 +340,12 @@ async function makeTwilioCall(phoneNumber){
         return { 
             success: true, 
             callSid: call.sid,
-            message: 'Call initiated successfully - recipient will hear "Hello world!"'
+            message: 'Call initiated - AI conversation started!'
         };
     } catch (error) {
         console.error('Error making call:', error);
         throw error;
     }
-
 }
 
 app.listen(port, () => {
