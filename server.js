@@ -8,7 +8,7 @@ const app = express();
 const port = 3000;
 
 // ChromaDB for persisting transcripts
-const chroma = new ChromaClient({ path: process.env.CHROMA_PATH || 'http://localhost:8000' });
+const chroma = new ChromaClient({ port: 8000 });
 let transcriptCollection;
 
 async function initChroma() {
