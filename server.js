@@ -41,6 +41,7 @@ const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 const client = twilio(accountSid, authToken);
 const { generateFollowUpQuestion, autoScheduleFromTranscript, extractKeywordsFromTranscript } = require('./openai-calls');
 const scheduledCalls = [];
+const callList = []; //all calls, ever
 
 const conversations = new Map();
 
@@ -288,7 +289,7 @@ function scheduleRecurringCalls(phoneNumber, frequency, time, endDate) {
 
     console.log(`Scheduled ${frequency} calls at ${time} for ${phoneNumber}`);
     console.log(`calculate all future calls: `)
-    console.log(getFutureCalls(scheduleObj,30))
+    callList.append(getFutureCalls(scheduleObj,30)); //add next 30 to callList
 
     return { success: true, callId };
 }
@@ -418,10 +419,14 @@ app.post('/call-status', async (req, res) => {
 });
 
 //get future calls based on current rules
-app.get('/future-calls', (req, res) => {
-    // Calculate fresh every time - it's fast!
-    const calls = calculateFutureCallsFromSchedules(scheduledCalls);
-    res.json({ calls });
+app.get('/all-future-calls', (req, res) => {
+    // Flatten the list of lists into one array
+    const allCalls = callList.flat();
+    res.json({ 
+        calls: allCalls.sort((a, b) => 
+            new Date(a.scheduledTime) - new Date(b.scheduledTime)
+        )
+    });
 });
 
 //Schedule the next 30 calls based on cron rule

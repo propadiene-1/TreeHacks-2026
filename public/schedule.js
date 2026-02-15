@@ -58,7 +58,7 @@ function updateStats() {
 async function updateCalendar() {
     try {
         // Fetch future calls from backend
-        const response = await fetch('/future-calls');
+        const response = await fetch('/all-future-calls');
         const data = await response.json();
         
         // Convert to FullCalendar events
