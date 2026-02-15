@@ -95,11 +95,9 @@ function iqr(arr) {
  * Returns Hz or null
  */
 function estimateF0Hz(pcm, sampleRate = 8000) {
-  // Use up to 320 samples (40 ms at 8kHz) if available
   const n = Math.min(pcm.length, 320);
   if (n < 160) return null;
 
-  // Normalize to float
   const x = new Float32Array(n);
   let mean = 0;
   for (let i = 0; i < n; i++) mean += pcm[i];
@@ -112,9 +110,8 @@ function estimateF0Hz(pcm, sampleRate = 8000) {
   }
   if (energy < 1e-5) return null;
 
-  // Human voice rough range 60 to 400 Hz
-  const minLag = Math.floor(sampleRate / 400); // 20 at 8k
-  const maxLag = Math.floor(sampleRate / 60);  // 133 at 8k
+  const minLag = Math.floor(sampleRate / 400);
+  const maxLag = Math.floor(sampleRate / 60);
   if (maxLag >= n) return null;
 
   let bestLag = -1;
@@ -131,7 +128,6 @@ function estimateF0Hz(pcm, sampleRate = 8000) {
 
   if (bestLag <= 0) return null;
 
-  // Basic voicing check: correlation must be strong enough
   const norm = energy;
   const strength = bestCorr / (norm + 1e-9);
   if (strength < 0.15) return null;
@@ -141,20 +137,17 @@ function estimateF0Hz(pcm, sampleRate = 8000) {
 
 /**
  * Spectral centroid and flatness using a small DFT (256)
- * This is light enough when sampled sparsely.
  */
 function spectralFeatures(pcm, sampleRate = 8000) {
   const N = 256;
   if (pcm.length < N) return null;
 
-  // Windowed float
   const x = new Float32Array(N);
   for (let i = 0; i < N; i++) {
     const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1));
     x[i] = (pcm[i] / 32768) * w;
   }
 
-  // DFT magnitude for bins 0..N/2
   const half = N / 2;
   const mags = new Float32Array(half + 1);
 
@@ -169,7 +162,6 @@ function spectralFeatures(pcm, sampleRate = 8000) {
     mags[k] = Math.sqrt(re * re + im * im) + 1e-12;
   }
 
-  // Centroid
   let num = 0;
   let den = 0;
   for (let k = 1; k <= half; k++) {
@@ -180,7 +172,6 @@ function spectralFeatures(pcm, sampleRate = 8000) {
   }
   const centroid = den > 0 ? num / den : null;
 
-  // Flatness (geometric mean / arithmetic mean)
   let logSum = 0;
   let linSum = 0;
   const count = half;
@@ -193,7 +184,6 @@ function spectralFeatures(pcm, sampleRate = 8000) {
   const ar = linSum / Math.max(1, count);
   const flatness = ar > 0 ? geo / ar : null;
 
-  // Breathiness proxy: high frequency ratio (2k to 4k) over total
   let hi = 0;
   let tot = 0;
   for (let k = 1; k <= half; k++) {
@@ -262,8 +252,63 @@ async function initChroma() {
 }
 
 (async () => {
-    await initChroma();
+  await initChroma();
 })();
+
+// Helpers: write a stable "call log" record that your UI can expand into graphs
+async function upsertCallLogToChroma(callLog) {
+  if (!transcriptCollection) return false;
+  if (!callLog?.callSid) return false;
+
+  const id = `calllog_${callLog.callSid}`;
+  const doc = JSON.stringify(callLog);
+
+  const metadata = {
+    type: 'call_log',
+    callSid: callLog.callSid,
+    phoneNumber: callLog.phoneNumber || '',
+    created_at: callLog.created_at || new Date().toISOString(),
+    pain_rating: callLog?.extracted?.pain_rating ?? null,
+    daily_mood: callLog?.extracted?.daily_mood ?? '',
+    symptoms: JSON.stringify(callLog?.extracted?.symptoms || [])
+  };
+
+  try {
+    // Prefer upsert if available
+    if (typeof transcriptCollection.upsert === 'function') {
+      await transcriptCollection.upsert({
+        ids: [id],
+        documents: [doc],
+        metadatas: [metadata]
+      });
+      return true;
+    }
+
+    // Fallback: try add; if already exists, delete then add
+    await transcriptCollection.add({
+      ids: [id],
+      documents: [doc],
+      metadatas: [metadata]
+    });
+    return true;
+  } catch (e) {
+    try {
+      if (typeof transcriptCollection.delete === 'function') {
+        await transcriptCollection.delete({ ids: [id] });
+        await transcriptCollection.add({
+          ids: [id],
+          documents: [doc],
+          metadatas: [metadata]
+        });
+        return true;
+      }
+    } catch (_) {
+      // ignore
+    }
+    console.warn('ChromaDB call log upsert failed:', e.message);
+    return false;
+  }
+}
 
 // Middleware
 app.use(express.json());
@@ -278,6 +323,7 @@ const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 const client = twilio(accountSid, authToken);
 const { generateFollowUpQuestion, autoScheduleFromTranscript, extractDBColumns, callOpenAI } = require('./openai-calls');
 const { actualPainFromTimeseries } = require('./pain-correction');
+
 const scheduledCalls = [];
 const mediaSessions = new Map();
 
@@ -285,109 +331,108 @@ const conversations = new Map();
 const symptomQueue = new Map();
 let dailySchedule = Array.from({ length: 32 }, () => []);
 
-
 function buildSymptomContext() {
-    if (symptomQueue.size === 0) return "No previous symptoms tracked.";
-    
-    let context = "PATIENT SYMPTOM HISTORY:\n\n";
-    const dueToday = dailySchedule[0] || [];
-    
-    if (dueToday.length > 0) {
-        context += "⚠️ SYMPTOMS TO CHECK TODAY:\n";
-        dueToday.forEach(item => {
-            context += `- ${item.symptom.toUpperCase()}: ${item.history.split('\n').pop()}\n`;
-        });
-        context += "\n";
-    }
-    
-    context += "ALL TRACKED SYMPTOMS:\n";
-    Array.from(symptomQueue.entries()).forEach(([symptom, data]) => {
-        context += `\n• ${symptom.toUpperCase()}: Every ${data.frequency} days\n`;
-        context += `  Recent: ${data.history.split('\n').slice(-2).join('\n  ')}\n`;
+  if (symptomQueue.size === 0) return "No previous symptoms tracked.";
+
+  let context = "PATIENT SYMPTOM HISTORY:\n\n";
+  const dueToday = dailySchedule[0] || [];
+
+  if (dueToday.length > 0) {
+    context += "⚠️ SYMPTOMS TO CHECK TODAY:\n";
+    dueToday.forEach(item => {
+      context += `- ${item.symptom.toUpperCase()}: ${item.history.split('\n').pop()}\n`;
     });
-    
-    return context;
+    context += "\n";
+  }
+
+  context += "ALL TRACKED SYMPTOMS:\n";
+  Array.from(symptomQueue.entries()).forEach(([symptom, data]) => {
+    context += `\n• ${symptom.toUpperCase()}: Every ${data.frequency} days\n`;
+    context += `  Recent: ${data.history.split('\n').slice(-2).join('\n  ')}\n`;
+  });
+
+  return context;
 }
 
 async function extractSymptomsFromTranscript(transcript) {
   try {
-      const result = await callOpenAI(
-          'Extract medical symptoms only. Return JSON: {"symptoms": ["symptom1", "symptom2"]}',
-          `Extract symptoms from:\n${transcript}`
-      );
-      return await consolidateSymptoms(result.symptoms || []);
+    const result = await callOpenAI(
+      'Extract medical symptoms only. Return JSON: {"symptoms": ["symptom1", "symptom2"]}',
+      `Extract symptoms from:\n${transcript}`
+    );
+    return await consolidateSymptoms(result.symptoms || []);
   } catch (error) {
-      console.error('Symptom extraction failed:', error.message);
-      return [];
+    console.error('Symptom extraction failed:', error.message);
+    return [];
   }
 }
 
 async function consolidateSymptoms(symptoms) {
   if (symptoms.length === 0) return [];
   const existing = Array.from(symptomQueue.keys());
-  
+
   try {
-      const result = await callOpenAI(
-          'Consolidate duplicate/similar symptoms. Examples: "headache", "head pain" → "headache". Return JSON: {"consolidated": [{"original": "x", "canonical": "y"}]}',
-          `New: ${symptoms.join(', ')}\nExisting: ${existing.join(', ')}`
-      );
-      
-      const mapping = new Map();
-      result.consolidated?.forEach(({ original, canonical }) => 
-          mapping.set(original.toLowerCase(), canonical.toLowerCase())
-      );
-      
-      return symptoms.map(s => mapping.get(s.toLowerCase()) || s.toLowerCase());
+    const result = await callOpenAI(
+      'Consolidate duplicate/similar symptoms. Examples: "headache", "head pain" → "headache". Return JSON: {"consolidated": [{"original": "x", "canonical": "y"}]}',
+      `New: ${symptoms.join(', ')}\nExisting: ${existing.join(', ')}`
+    );
+
+    const mapping = new Map();
+    result.consolidated?.forEach(({ original, canonical }) =>
+      mapping.set(original.toLowerCase(), canonical.toLowerCase())
+    );
+
+    return symptoms.map(s => mapping.get(s.toLowerCase()) || s.toLowerCase());
   } catch (error) {
-      console.error('Consolidation failed:', error.message);
-      return symptoms.map(s => s.toLowerCase());
+    console.error('Consolidation failed:', error.message);
+    return symptoms.map(s => s.toLowerCase());
   }
 }
 
 function rebuildDailySchedule() {
   dailySchedule = Array.from({ length: 32 }, () => []);
   const now = new Date();
-  
+
   symptomQueue.forEach((data, symptom) => {
-      const lastChecked = new Date(data.lastChecked);
-      const nextCheck = new Date(lastChecked.getTime() + data.frequency * 30 * 1000);
-      const secondsUntil = (nextCheck - now) / 1000;
-      const daysUntil = Math.floor(secondsUntil / 30);
-      const dayIndex = Math.max(0, Math.min(31, daysUntil));
-      
-      dailySchedule[dayIndex].push({
-          symptom,
-          frequency: data.frequency,
-          lastChecked: data.lastChecked,
-          daysUntil,
-          history: data.history
-      });
+    const lastChecked = new Date(data.lastChecked);
+    const nextCheck = new Date(lastChecked.getTime() + data.frequency * 30 * 1000);
+    const secondsUntil = (nextCheck - now) / 1000;
+    const daysUntil = Math.floor(secondsUntil / 30);
+    const dayIndex = Math.max(0, Math.min(31, daysUntil));
+
+    dailySchedule[dayIndex].push({
+      symptom,
+      frequency: data.frequency,
+      lastChecked: data.lastChecked,
+      daysUntil,
+      history: data.history
+    });
   });
-  
+
   printSymptomQueue();
 }
 
 function printSymptomQueue() {
   console.log('\n========== SYMPTOM PRIORITY QUEUE ==========');
   Array.from(symptomQueue.entries())
-      .sort((a, b) => a[1].frequency - b[1].frequency)
-      .forEach(([symptom, data]) => {
-          console.log(`📋 ${symptom.toUpperCase()}`);
-          console.log(`   Frequency: Every ${data.frequency} day(s)`);
-          console.log(`   Last Checked: ${new Date(data.lastChecked).toLocaleString()}`);
-          console.log(`   History: ${data.history.split('\n').pop()}\n`);
-      });
-  
+    .sort((a, b) => a[1].frequency - b[1].frequency)
+    .forEach(([symptom, data]) => {
+      console.log(`📋 ${symptom.toUpperCase()}`);
+      console.log(`   Frequency: Every ${data.frequency} day(s)`);
+      console.log(`   Last Checked: ${new Date(data.lastChecked).toLocaleString()}`);
+      console.log(`   History: ${data.history.split('\n').pop()}\n`);
+    });
+
   console.log('========== DAILY SCHEDULE (0-31 DAYS) ==========');
   dailySchedule.forEach((items, dayIndex) => {
-      if (items.length > 0) {
-          const label = dayIndex === 0 ? 'TODAY/OVERDUE' : dayIndex === 1 ? 'TOMORROW' : `DAY ${dayIndex}`;
-          console.log(`\n📅 ${label}:`);
-          items.forEach(item => {
-              console.log(`   • ${item.symptom} (every ${item.frequency} days)`);
-              if (item.daysUntil < 0) console.log(`     ⚠️  OVERDUE by ${Math.abs(item.daysUntil)} days`);
-          });
-      }
+    if (items.length > 0) {
+      const label = dayIndex === 0 ? 'TODAY/OVERDUE' : dayIndex === 1 ? 'TOMORROW' : `DAY ${dayIndex}`;
+      console.log(`\n📅 ${label}:`);
+      items.forEach(item => {
+        console.log(`   • ${item.symptom} (every ${item.frequency} days)`);
+        if (item.daysUntil < 0) console.log(`     ⚠️  OVERDUE by ${Math.abs(item.daysUntil)} days`);
+      });
+    }
   });
   console.log('\n==============================================\n');
 }
@@ -396,31 +441,31 @@ async function updateSymptomFrequencies(symptoms, transcript) {
   if (symptoms.length === 0) return;
 
   const existingSymptoms = Array.from(symptomQueue.entries()).map(([symptom, data]) => ({
-      symptom, ...data
+    symptom, ...data
   }));
 
   try {
-      const result = await callOpenAI(
-          `Determine check-in frequencies: Severe 1-3 days, Moderate 7 days, Mild 14 days, Resolved 21-30 days. Return JSON: {"symptoms": [{"name": "x", "frequency": 7, "summary": "y"}]}`,
-          `Conversation:\n${transcript}\n\nSymptoms: ${symptoms.join(', ')}\n\nExisting:\n${JSON.stringify(existingSymptoms, null, 2)}`
-      );
+    const result = await callOpenAI(
+      `Determine check-in frequencies: Severe 1-3 days, Moderate 7 days, Mild 14 days, Resolved 21-30 days. Return JSON: {"symptoms": [{"name": "x", "frequency": 7, "summary": "y"}]}`,
+      `Conversation:\n${transcript}\n\nSymptoms: ${symptoms.join(', ')}\n\nExisting:\n${JSON.stringify(existingSymptoms, null, 2)}`
+    );
 
-      const now = new Date().toISOString();
-      result.symptoms?.forEach(({ name, frequency, summary }) => {
-          const canonical = name.toLowerCase();
-          const existing = symptomQueue.get(canonical);
-          const historyEntry = `[${new Date().toLocaleDateString()}] ${summary || 'Mentioned'}`;
-          
-          symptomQueue.set(canonical, {
-              frequency: frequency || 7,
-              lastChecked: now,
-              history: existing ? `${existing.history}\n${historyEntry}` : historyEntry
-          });
+    const now = new Date().toISOString();
+    result.symptoms?.forEach(({ name, frequency, summary }) => {
+      const canonical = name.toLowerCase();
+      const existing = symptomQueue.get(canonical);
+      const historyEntry = `[${new Date().toLocaleDateString()}] ${summary || 'Mentioned'}`;
+
+      symptomQueue.set(canonical, {
+        frequency: frequency || 7,
+        lastChecked: now,
+        history: existing ? `${existing.history}\n${historyEntry}` : historyEntry
       });
+    });
 
-      rebuildDailySchedule();
+    rebuildDailySchedule();
   } catch (error) {
-      console.error('Frequency update failed:', error.message);
+    console.error('Frequency update failed:', error.message);
   }
 }
 
@@ -433,7 +478,7 @@ function freshMediaSession(callSid) {
     mediaFrames: 0,
     streamSid: null,
 
-    // 60s rolling window
+    // rolling window
     windowMs: 5000,
     windowStartedAt: Date.now(),
     windowFrames: 0,
@@ -441,7 +486,7 @@ function freshMediaSession(callSid) {
     windowZcrSum: 0,
     windowSpeechFrames: 0,
 
-    // new: segment tracking inside each 60s window
+    // segment tracking inside each window
     seg: {
       inSpeech: false,
       segStartMs: Date.now()
@@ -456,7 +501,7 @@ function freshMediaSession(callSid) {
     windowCoughCount: 0,
     coughCooldownUntil: 0,
 
-    // new: per second series for old visuals
+    // per second series
     sec: {
       startedAt: Date.now(),
       frames: 0,
@@ -466,11 +511,14 @@ function freshMediaSession(callSid) {
     rmsDbSeries: [],      // [{t, rmsDb}]
     voicedSeries: [],     // [{t, voicedPct}]
 
-    // 60s summaries that match old indicators card
+    // rolling summaries
     rolling60Series: [],  // [{t, ...indicators...}]
 
     // abnormal events
     abnormalLog: [],
+
+    // optional series you might already be reading in UI
+    biomarkerSeries: [],
 
     baseline: {
       ready: false,
@@ -596,7 +644,8 @@ app.post('/handle-speech', async (req, res) => {
   } catch (error) {
     console.error('Error getting AI response:', error);
 
-    twiml.say({ voice: 'alice' }, "Sorry, I didn't quite catch that!");
+    const fallbackResponse = "Sorry, I didn't quite catch that!";
+    twiml.say({ voice: 'alice' }, fallbackResponse);
 
     conversations.get(callSid).push({
       speaker: 'AI',
@@ -686,67 +735,71 @@ app.post('/make-call', async (req, res) => {
 
 // Schedule recurring
 function scheduleRecurringCalls(phoneNumber, frequency, time, endDate) {
-  phoneNumber = "+15108308921";
+  // NOTE: You were force overriding the phone number before; that makes testing easier,
+  // but it also makes the API ignore what the UI sends.
+  // If you still want a hardcoded number for local dev, gate it on an env var.
+  if (process.env.FORCE_PHONE_NUMBER) {
+    phoneNumber = process.env.FORCE_PHONE_NUMBER;
+  }
 
-  const [hours, minutes] = time.split(':');
+  const [hours, minutes] = (time || '09:00').split(':');
 
   let cronExpression;
   switch (frequency) {
-    case 'daily': 
-      cronExpression = `*/60 * * * * *`; // Every 30 seconds
+    case 'daily':
+      cronExpression = `0 ${minutes} ${hours} * * *`;
       break;
-    case 'weekly': 
-      cronExpression = `${minutes} ${hours} * * 1`; 
+    case 'weekly':
+      cronExpression = `0 ${minutes} ${hours} * * 1`;
       break;
-    default: 
+    default:
       throw new Error('Invalid frequency. Use: daily or weekly');
   }
 
   const callId = `recurring-${Date.now()}`;
   const dateScheduled = new Date();
 
-    const task = cron.schedule(cronExpression, async () => {
-        console.log(`Making recurring call to ${phoneNumber}`);
-        
-        // Stop all calls after end date
-        if (endDate) {
-            const now = new Date();
-            const end = new Date(endDate);
-            
-            if (now > end) {
-                console.log(`End date reached for ${phoneNumber}. Stopping calls.`);
-                task.stop();
-                
-                const index = scheduledCalls.findIndex(c => c.id === callId);
-                if (index > -1) scheduledCalls.splice(index, 1);
-                
-                return;
-            }
-        }
-        
-        try {
-            const result = await makeTwilioCall(phoneNumber);
-            console.log(`Recurring call initiated: ${result.callSid}`);
-        } catch (error) {
-            console.error(`Failed to make recurring call: ${error.message}`);
-        }
-    });
+  const task = cron.schedule(cronExpression, async () => {
+    console.log(`Making recurring call to ${phoneNumber}`);
 
-    const scheduleObj = {
-        id: callId,
-        phoneNumber,
-        frequency,
-        time,
-        endDate: endDate || null,
-        dateScheduled,
-        task
-    };
+    if (endDate) {
+      const now = new Date();
+      const end = new Date(endDate);
 
-    scheduledCalls.push(scheduleObj);
+      if (now > end) {
+        console.log(`End date reached for ${phoneNumber}. Stopping calls.`);
+        task.stop();
 
-    console.log(`Scheduled ${frequency} calls at ${time} for ${phoneNumber}`);
+        const index = scheduledCalls.findIndex(c => c.id === callId);
+        if (index > -1) scheduledCalls.splice(index, 1);
 
-    return { success: true, callId };
+        return;
+      }
+    }
+
+    try {
+      const result = await makeTwilioCall(phoneNumber);
+      console.log(`Recurring call initiated: ${result.callSid}`);
+    } catch (error) {
+      console.error(`Failed to make recurring call: ${error.message}`);
+    }
+  });
+
+  const scheduleObj = {
+    id: callId,
+    phoneNumber,
+    frequency,
+    time,
+    endDate: endDate || null,
+    dateScheduled,
+    task
+  };
+
+  scheduledCalls.push(scheduleObj);
+
+  console.log(`Scheduled ${frequency} calls at ${time} for ${phoneNumber}`);
+
+  return { success: true, callId };
 }
 
 app.post('/schedule-recurring', (req, res) => {
@@ -766,69 +819,125 @@ app.get('/scheduled-calls', (req, res) => {
   res.json({ calls });
 });
 
-// Call status webhook: persist call log with new biomarker payload
+// Call status webhook: persist call log with biomarker payload
 app.post('/call-status', async (req, res) => {
-    const callSid = req.body.CallSid;
-    const callStatus = req.body.CallStatus;
-    const phoneNumber = req.body.From; // Patient's phone number
-    
-    console.log(`Call ${callSid} status: ${callStatus}`);
-    
-    if (callStatus === 'completed') {
-        const conversationData = conversations.get(callSid);
+  const callSid = req.body.CallSid;
+  const callStatus = req.body.CallStatus;
 
-        if (conversationData && conversationData.length > 0) {
-            const transcriptString = conversationData.map(entry =>
-                `${entry.speaker}: ${entry.message}`
-            ).join('\n');
+  // IMPORTANT FIX:
+  // For outbound calls: req.body.From is your Twilio number, req.body.To is the patient.
+  // Using From made phoneNumber wrong and often blank in your UI.
+  const phoneNumber = req.body.To || req.body.From || '';
 
-            const symptoms = await extractSymptomsFromTranscript(transcriptString);
-            console.log(`Extracted symptoms from ${callSid}:`, symptoms);
-            
-            await updateSymptomFrequencies(symptoms, transcriptString);
+  console.log(`Call ${callSid} status: ${callStatus}`);
 
-            // Save to DB only when call has ended: one doc = JSON array of [bot question, user response] tuples
-            // const pairs = conversationToQAPairs(conversationData);
-            if (transcriptCollection && conversationData.length > 0) {
-                (async () => {
-                    try {
-                        //const keywords = await extractKeywordsFromTranscript(transcriptString);
-                        const { extractDBColumns } = require('./openai-calls');
-                        const features = await extractDBColumns(transcriptString, phoneNumber);
-                        await transcriptCollection.add({
-                            ids: [`transcript_${callSid}_${Date.now()}`],
-                            documents: [transcriptString],
-                            metadatas: [{
-                                callSid,
-                                phoneNumber,
-                                created_at: new Date().toISOString(),
-                                pain_rating: features.pain_rating,
-                                pain_phrases: JSON.stringify(features.pain_phrases || []),
-                                body_parts: JSON.stringify(features.body_parts || []),
-                                body_part_phrases: JSON.stringify(features.body_part_phrases || []),
-                                daily_mood: features.daily_mood || '',
-                                symptoms: JSON.stringify(symptoms),
-                                estimated_health_metrics: JSON.stringify(features.estimated_health_metrics || {})
-                            }]
-                        });
-                        console.log(`[${callSid}] Saved to ChromaDB with extracted features`);
-                    } catch (err) {
-                        console.warn('ChromaDB save failed:', err.message);
-                    }
-                })();
-            }
+  if (callStatus === 'completed') {
+    const conversationData = conversations.get(callSid);
+    const media = mediaSessions.get(callSid);
 
-            console.log('Call completed. Auto-scheduling follow-up...');
-            autoScheduleFromTranscript(transcriptString, phoneNumber, scheduleRecurringCalls)
-            .then(result => {
-                console.log('Auto-scheduled:', result);
-            })
-                .catch(error => {
-                console.error('Auto-scheduling failed:', error.message);
-            });
-        conversations.delete(callSid);
-        mediaSessions.delete(callSid);
+    const createdAtIso = new Date().toISOString();
+
+    let transcriptString = '';
+    if (conversationData && conversationData.length > 0) {
+      transcriptString = conversationData.map(entry => `${entry.speaker}: ${entry.message}`).join('\n');
     }
+
+    let symptoms = [];
+    let extracted = {};
+    if (transcriptString) {
+      try {
+        symptoms = await extractSymptomsFromTranscript(transcriptString);
+        console.log(`Extracted symptoms from ${callSid}:`, symptoms);
+
+        await updateSymptomFrequencies(symptoms, transcriptString);
+
+        // Extract your DB columns once and reuse for both transcript and call log
+        extracted = await extractDBColumns(transcriptString, phoneNumber);
+      } catch (e) {
+        console.warn(`[${callSid}] extract flow failed:`, e.message);
+        extracted = {};
+      }
+    }
+
+    // Build a single "call log" object that your dashboard can list by timestamp and expand into graphs
+    const callLog = {
+      type: 'call_log',
+      callSid,
+      phoneNumber,
+      created_at: createdAtIso,
+
+      transcript: transcriptString,
+
+      extracted: {
+        pain_rating: extracted?.pain_rating ?? null,
+        pain_phrases: extracted?.pain_phrases || [],
+        body_parts: extracted?.body_parts || [],
+        body_part_phrases: extracted?.body_part_phrases || [],
+        daily_mood: extracted?.daily_mood || '',
+        symptoms: symptoms || [],
+        estimated_health_metrics: extracted?.estimated_health_metrics || {}
+      },
+
+      // What the UI needs to render expandable monitoring charts
+      biomarkers: {
+        // your existing series (safe, no raw audio)
+        rolling60Series: media?.rolling60Series || [],
+        rmsDbSeries: media?.rmsDbSeries || [],
+        voicedSeries: media?.voicedSeries || [],
+        abnormalLog: media?.abnormalLog || [],
+        // optional
+        biomarkerSeries: media?.biomarkerSeries || [],
+        startedAt: media?.startedAt ? new Date(media.startedAt).toISOString() : null,
+        lastMediaAt: media?.lastMediaAt ? new Date(media.lastMediaAt).toISOString() : null
+      }
+    };
+
+    // Always store in memory so the UI is never blank
+    upsertInMemoryCallLog(callLog);
+
+    // Store the call log (stable id calllog_<callSid>) so /api/call-logs can find it
+    await upsertCallLogToChroma(callLog);
+
+    // Keep your existing transcript save if you want semantic search, but fix metadata consistency
+    // (This record is for semantic search, not for the call log list.)
+    if (transcriptCollection && transcriptString) {
+      try {
+        await transcriptCollection.add({
+          ids: [`transcript_${callSid}_${Date.now()}`],
+          documents: [transcriptString],
+          metadatas: [{
+            type: 'transcript',
+            callSid,
+            phoneNumber,
+            created_at: createdAtIso,
+            pain_rating: extracted?.pain_rating ?? null,
+            pain_phrases: JSON.stringify(extracted?.pain_phrases || []),
+            body_parts: JSON.stringify(extracted?.body_parts || []),
+            body_part_phrases: JSON.stringify(extracted?.body_part_phrases || []),
+            daily_mood: extracted?.daily_mood || '',
+            symptoms: JSON.stringify(symptoms || []),
+            estimated_health_metrics: JSON.stringify(extracted?.estimated_health_metrics || {})
+          }]
+        });
+        console.log(`[${callSid}] Saved transcript for semantic search`);
+      } catch (err) {
+        console.warn('ChromaDB transcript save failed:', err.message);
+      }
+    }
+
+    if (transcriptString) {
+      console.log('Call completed. Auto-scheduling follow-up...');
+      autoScheduleFromTranscript(transcriptString, phoneNumber, scheduleRecurringCalls)
+        .then(result => {
+          console.log('Auto-scheduled:', result);
+        })
+        .catch(error => {
+          console.error('Auto-scheduling failed:', error.message);
+        });
+    }
+
+    conversations.delete(callSid);
+    mediaSessions.delete(callSid);
   }
 
   res.sendStatus(200);
@@ -864,7 +973,13 @@ app.get('/api/call-logs', async (req, res) => {
       chromaLogs = ids.map((id, i) => {
         const m = metas[i] || {};
         if (m.type !== 'call_log') return null;
-        return { id, callSid: m.callSid, phoneNumber: m.phoneNumber, created_at: m.created_at, source: 'chroma' };
+        return {
+          id,
+          callSid: m.callSid,
+          phoneNumber: m.phoneNumber,
+          created_at: m.created_at,
+          source: 'chroma'
+        };
       }).filter(Boolean);
     } catch (e) {
       chromaLogs = [];
@@ -895,13 +1010,38 @@ app.get('/api/call-logs/:callSid', async (req, res) => {
 
     const got = await transcriptCollection.get({
       ids: [`calllog_${callSid}`],
-      include: ['documents']
+      include: ['documents', 'metadatas']
     });
 
     const doc = got?.documents?.[0];
     if (!doc) return res.status(404).json({ error: 'Not found' });
 
     res.json({ log: JSON.parse(doc), source: 'chroma' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Convenience endpoint for just biomarker series (nice for the expandable graphs)
+app.get('/api/call-logs/:callSid/biomarkers', async (req, res) => {
+  try {
+    const callSid = req.params.callSid;
+
+    const mem = inMemoryCallLogsByCallSid.get(callSid);
+    if (mem) return res.json({ biomarkers: mem.biomarkers || {}, source: 'memory' });
+
+    if (!transcriptCollection) return res.status(404).json({ error: 'Not found' });
+
+    const got = await transcriptCollection.get({
+      ids: [`calllog_${callSid}`],
+      include: ['documents']
+    });
+
+    const doc = got?.documents?.[0];
+    if (!doc) return res.status(404).json({ error: 'Not found' });
+
+    const parsed = JSON.parse(doc);
+    res.json({ biomarkers: parsed.biomarkers || {}, source: 'chroma' });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -928,9 +1068,9 @@ function finalizeWindowAndAppendPoint(session) {
     frames
   };
 
+  if (!Array.isArray(session.biomarkerSeries)) session.biomarkerSeries = [];
   session.biomarkerSeries.push(point);
 
-  // reset window
   session.windowStartedAt = Date.now();
   session.windowFrames = 0;
   session.windowRmsSum = 0;
@@ -977,12 +1117,10 @@ wss.on('connection', (ws, req) => {
       const pcm = decodeMulawBase64ToInt16(payload);
       const rms = frameRms(pcm);
       const zcr = frameZcr(pcm);
-      const db = rmsToDb(rms);
 
-      // Simple voiced gate
       const isSpeech = rms > 0.02;
 
-      // 1 second series for old visuals
+      // per second series
       s.sec.frames += 1;
       s.sec.rmsSum += rms;
       if (isSpeech) s.sec.voicedFrames += 1;
@@ -1002,7 +1140,7 @@ wss.on('connection', (ws, req) => {
         s.sec.voicedFrames = 0;
       }
 
-      // Segment tracking for phrase and pause lengths inside window
+      // segment tracking
       const seg = s.seg;
       const curInSpeech = seg.inSpeech;
 
@@ -1015,16 +1153,15 @@ wss.on('connection', (ws, req) => {
         seg.segStartMs = now;
       }
 
-      // Cough heuristic, no raw audio, just counters
+      // cough heuristic
       if (now >= s.coughCooldownUntil) {
-        // loud, noisy, brief onset signature
         if (isSpeech && rms > 0.12 && zcr > 0.12) {
           s.windowCoughCount += 1;
           s.coughCooldownUntil = now + 1000;
         }
       }
 
-      // Sample more expensive features sparsely
+      // expensive features sparsely
       if (isSpeech && (s.mediaFrames % 10 === 0)) {
         const f0 = estimateF0Hz(pcm, 8000);
         if (f0 != null && f0 >= 50 && f0 <= 450) s.windowF0.push(f0);
@@ -1038,14 +1175,13 @@ wss.on('connection', (ws, req) => {
         }
       }
 
-      // 60 second rolling window summary
+      // rolling window
       s.windowFrames += 1;
       s.windowRmsSum += rms;
       s.windowZcrSum += zcr;
       if (isSpeech) s.windowSpeechFrames += 1;
 
       if (now - s.windowStartedAt >= s.windowMs) {
-        // close the active segment into this window before computing
         const activeDurSec = (now - s.seg.segStartMs) / 1000;
         if (s.seg.inSpeech) s.windowPhrasesSec.push(activeDurSec);
         else s.windowPausesSec.push(activeDurSec);
@@ -1062,7 +1198,6 @@ wss.on('connection', (ws, req) => {
         const medPhrase = median(s.windowPhrasesSec);
         const medPause = median(s.windowPausesSec);
 
-        // Convert segment counts into per minute
         const windowMinutes = s.windowMs / 60000;
         const pausesPerMin = (s.windowPausesSec.length / Math.max(1e-9, windowMinutes));
         const phrasesPerMin = (s.windowPhrasesSec.length / Math.max(1e-9, windowMinutes));
@@ -1074,7 +1209,6 @@ wss.on('connection', (ws, req) => {
         const flatnessMean = s.windowSpecCount ? (s.windowFlatnessSum / s.windowSpecCount) : null;
         const breathMean = s.windowSpecCount ? (s.windowBreathSum / s.windowSpecCount) : null;
 
-        // Baseline z scores using the first 5 windows
         const b = s.baseline;
         const baselineWindowsTarget = 3;
 
@@ -1103,7 +1237,6 @@ wss.on('connection', (ws, req) => {
           baselineZPausesPerMin = (pausesPerMin - b.pauseRateMean) / rStd;
         }
 
-        // Flags
         const breathinessFlag = breathMean != null ? (breathMean > 0.38) : false;
         const coughFlag = s.windowCoughCount >= 2;
         const combinedFlag =
@@ -1127,13 +1260,9 @@ wss.on('connection', (ws, req) => {
 
         const summary = {
           t: new Date(s.windowStartedAt).toISOString(),
-
-          // old three mini charts equivalents
           meanRms,
           meanZcr,
           speechRatio,
-
-          // indicators card fields
           silencePct,
           voicedPct,
           medianPhraseLenSec: medPhrase,
@@ -1146,7 +1275,6 @@ wss.on('connection', (ws, req) => {
           spectralFlatness: flatnessMean,
           breathinessProxy: breathMean,
           coughCount: s.windowCoughCount,
-
           baselineZSilence,
           baselineZPhraseLen,
           baselineZPausesPerMin,
@@ -1157,7 +1285,6 @@ wss.on('connection', (ws, req) => {
 
         s.rolling60Series.push(summary);
 
-        // reset window accumulators
         s.windowStartedAt = now;
         s.windowFrames = 0;
         s.windowRmsSum = 0;
@@ -1173,12 +1300,10 @@ wss.on('connection', (ws, req) => {
         s.windowSpecCount = 0;
         s.windowCoughCount = 0;
 
-        // reset segment state baseline point start
         s.seg.segStartMs = now;
       }
 
       mediaSessions.set(callSid, s);
-
       return;
     }
 
@@ -1205,92 +1330,89 @@ wss.on('connection', (ws, req) => {
 
 // Semantic search on health data
 app.post('/api/search-health', async (req, res) => {
-    try {
-        const { query, phoneNumber, limit = 5 } = req.body;
-        
-        if (!query) {
-            return res.status(400).json({ error: 'Query required' });
-        }
-        
-        if (!transcriptCollection) {
-            return res.status(503).json({ error: 'Database not available' });
-        }
-        
-        console.log(`Semantic search: "${query}" for ${phoneNumber || 'all users'}`);
-        
-        // Semantic search on ChromaDB
-        const searchResults = await transcriptCollection.query({
-            queryTexts: [query],
-            nResults: Math.min(limit, 10),
-            where: phoneNumber ? { phoneNumber } : undefined,
-            include: ['documents', 'metadatas', 'distances']
-        });
-        
-        const docs = searchResults?.documents?.[0] || [];
-        const metas = searchResults?.metadatas?.[0] || [];
-        const distances = searchResults?.distances?.[0] || [];
-        
-        // Format results
-        const results = docs.map((doc, i) => ({
-            document: doc,
-            metadata: metas[i],
-            relevanceScore: 1 - (distances[i] || 1), // Convert distance to similarity
-            distance: distances[i]
-        })).filter(r => r.relevanceScore > 0.3); // Only show relevant results
-        
-        console.log(`Found ${results.length} relevant results`);
-        
-        res.json({
-            query,
-            results,
-            total: results.length
-        });
-        
-    } catch (error) {
-        console.error('Semantic search error:', error);
-        res.status(500).json({ error: error.message });
+  try {
+    const { query, phoneNumber, limit = 5 } = req.body;
+
+    if (!query) {
+      return res.status(400).json({ error: 'Query required' });
     }
+
+    if (!transcriptCollection) {
+      return res.status(503).json({ error: 'Database not available' });
+    }
+
+    console.log(`Semantic search: "${query}" for ${phoneNumber || 'all users'}`);
+
+    const searchResults = await transcriptCollection.query({
+      queryTexts: [query],
+      nResults: Math.min(limit, 10),
+      where: phoneNumber ? { phoneNumber } : undefined,
+      include: ['documents', 'metadatas', 'distances']
+    });
+
+    const docs = searchResults?.documents?.[0] || [];
+    const metas = searchResults?.metadatas?.[0] || [];
+    const distances = searchResults?.distances?.[0] || [];
+
+    const results = docs.map((doc, i) => ({
+      document: doc,
+      metadata: metas[i],
+      relevanceScore: 1 - (distances[i] || 1),
+      distance: distances[i]
+    })).filter(r => r.relevanceScore > 0.3);
+
+    console.log(`Found ${results.length} relevant results`);
+
+    res.json({
+      query,
+      results,
+      total: results.length
+    });
+
+  } catch (error) {
+    console.error('Semantic search error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Get demo transcripts for dashboard
 app.get('/api/demo-data', async (req, res) => {
+  try {
+    let demoCollection;
     try {
-        // Try to get demo collection
-        let demoCollection;
-        try {
-            demoCollection = await chroma.getCollection({ name: 'demo_transcripts' });
-        } catch (e) {
-            return res.json({ calls: [], message: 'Demo collection not found' });
-        }
-        
-        const demoData = await demoCollection.get({
-            limit: 100,
-            include: ['documents', 'metadatas']
-        });
-        
-        const calls = (demoData?.ids || []).map((id, i) => {
-            const meta = demoData.metadatas[i] || {};
-            const doc = demoData.documents[i];
-            
-            return {
-                id,
-                callSid: meta.callSid || id,
-                phoneNumber: meta.phoneNumber || 'Demo patient',
-                created_at: meta.created_at,
-                pain_rating: meta.pain_rating,
-                daily_mood: meta.daily_mood,
-                body_parts: meta.body_parts,
-                pain_phrases: meta.pain_phrases,
-                transcript: doc
-            };
-        }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        
-        res.json({ calls });
-        
-    } catch (error) {
-        console.error('Demo data error:', error);
-        res.status(500).json({ error: error.message });
+      demoCollection = await chroma.getCollection({ name: 'demo_transcripts' });
+    } catch (e) {
+      return res.json({ calls: [], message: 'Demo collection not found' });
     }
+
+    const demoData = await demoCollection.get({
+      limit: 100,
+      include: ['documents', 'metadatas']
+    });
+
+    const calls = (demoData?.ids || []).map((id, i) => {
+      const meta = demoData.metadatas[i] || {};
+      const doc = demoData.documents[i];
+
+      return {
+        id,
+        callSid: meta.callSid || id,
+        phoneNumber: meta.phoneNumber || 'Demo patient',
+        created_at: meta.created_at,
+        pain_rating: meta.pain_rating,
+        daily_mood: meta.daily_mood,
+        body_parts: meta.body_parts,
+        pain_phrases: meta.pain_phrases,
+        transcript: doc
+      };
+    }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    res.json({ calls });
+
+  } catch (error) {
+    console.error('Demo data error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 server.listen(port, '0.0.0.0', () => {
