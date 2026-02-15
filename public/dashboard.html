@@ -18,6 +18,68 @@
         .chart-section { margin-top: 40px; padding: 20px; background: #f8fcfd; border-radius: 12px; border: 1px solid #e0e8ec; }
         .chart-section h2 { margin: 0 0 16px 0; font-size: 1.25rem; color: #333; }
         .chart-wrap { position: relative; height: 280px; }
+        .readings-table-section { margin-top: 28px; }
+        .readings-table-section h3 { margin: 0 0 14px 0; font-size: 1.1rem; font-weight: 600; color: #333; }
+        .pain-readings-table-wrap {
+            overflow: hidden;
+            border-radius: 12px;
+            border: 1px solid #e0e8ec;
+            box-shadow: 0 2px 8px rgba(54, 134, 176, 0.06);
+            background: #fff;
+        }
+        .pain-readings-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+        .pain-readings-table thead th {
+            background: linear-gradient(135deg, #5ca4c4 0%, #3686b0 100%);
+            color: #fff;
+            font-weight: 600;
+            text-align: left;
+            padding: 14px 18px;
+            white-space: nowrap;
+        }
+        .pain-readings-table thead th:first-child { padding-left: 20px; }
+        .pain-readings-table thead th:last-child { padding-right: 20px; }
+        .pain-readings-table tbody tr {
+            border-bottom: 1px solid #eef4f7;
+            transition: background 0.15s ease;
+        }
+        .pain-readings-table tbody tr:hover { background: #f8fcfd; }
+        .pain-readings-table tbody tr:last-child { border-bottom: none; }
+        .pain-readings-table tbody tr:nth-child(even) { background: #fafcfd; }
+        .pain-readings-table tbody tr:nth-child(even):hover { background: #f0f8fb; }
+        .pain-readings-table td {
+            padding: 14px 18px;
+            color: #333;
+        }
+        .pain-readings-table td:first-child { padding-left: 20px; font-weight: 500; color: #2477a6; }
+        .pain-readings-table td:last-child { padding-right: 20px; }
+        .pain-readings-table td.num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            color: #444;
+        }
+        .pain-readings-table .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .pain-readings-table .improved .badge {
+            background: #d4edda;
+            color: #155724;
+        }
+        .pain-readings-table .worse .badge {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .pain-readings-table .same .badge {
+            background: #e9ecef;
+            color: #495057;
+        }
     </style>
 </head>
 <body>
@@ -43,6 +105,10 @@
         <h2>Pain over time</h2>
         <div class="chart-wrap">
             <canvas id="painChart"></canvas>
+        </div>
+        <div class="readings-table-section">
+            <h3>Readings per day</h3>
+            <div id="painReadingsTable"></div>
         </div>
     </section>
 
@@ -164,6 +230,7 @@
             const expectedPain = timeseries.map(d => expectedFromMoodAndPhysical(d.mood, d.physicalCondition));
 
             // Actual pain: perception-bias correction + baseline (from server algorithm)
+            let actualPainData = [];
             let actualPain = [];
             try {
                 const res = await fetch('/api/actual-pain', {
@@ -173,7 +240,8 @@
                 });
                 const json = await res.json();
                 if (json.data && json.data.length) {
-                    actualPain = json.data.map(r => r.actualPain);
+                    actualPainData = json.data;
+                    actualPain = actualPainData.map(r => r.actualPain);
                 }
             } catch (e) {
                 console.warn('Actual pain API failed, using corrected only in UI', e);
@@ -233,10 +301,60 @@
                 }
             });
 
+            // Table: readings per day, baseline, pain improved
+            if (actualPainData.length) {
+                renderPainReadingsTable(actualPainData);
+            }
+
             return window._painChartInstance;
         }
 
-        // Demo: sample timeseries; chart uses /api/actual-pain for actual pain line
+        /**
+         * Render table: Date | Reported | Baseline | Actual | Pain improved
+         * @param {Array<{date?: string, reportedPain: number, baseline: number, actualPain: number}>} data - from /api/actual-pain
+         */
+        function renderPainReadingsTable(data) {
+            const container = document.getElementById('painReadingsTable');
+            if (!container) return;
+            const thresh = 0.3; // same if |baseline - actual| <= thresh
+            let html = '<div class="pain-readings-table-wrap"><table class="pain-readings-table"><thead><tr><th>Date</th><th>Reported pain</th><th>Baseline pain</th><th>Actual pain</th><th>Pain improved</th></tr></thead><tbody>';
+            data.forEach(row => {
+                const baseline = row.baseline != null ? row.baseline.toFixed(1) : '—';
+                const actual = row.actualPain != null ? row.actualPain.toFixed(1) : '—';
+                const diff = row.baseline != null && row.actualPain != null ? row.baseline - row.actualPain : null;
+                let improved = '—';
+                let cls = '';
+                if (diff != null) {
+                    if (diff > thresh) {
+                        improved = '<span class="badge">Yes (' + diff.toFixed(1) + ')</span>';
+                        cls = 'improved';
+                    } else if (diff < -thresh) {
+                        improved = '<span class="badge">Worse (' + (-diff).toFixed(1) + ')</span>';
+                        cls = 'worse';
+                    } else {
+                        improved = '<span class="badge">Same</span>';
+                        cls = 'same';
+                    }
+                }
+                html += `<tr>
+                    <td>${escapeHtml(row.date || '—')}</td>
+                    <td class="num">${row.reportedPain != null ? row.reportedPain.toFixed(1) : '—'}</td>
+                    <td class="num">${baseline}</td>
+                    <td class="num">${actual}</td>
+                    <td class="${cls}">${improved}</td>
+                </tr>`;
+            });
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text == null ? '' : String(text);
+            return div.innerHTML;
+        }
+
+        // Demo: sample timeseries; chart uses /api/actual-pain for actual pain line + table
         const sampleTimeseries = [
             { date: '02-08', mood: 5, physicalCondition: 4, painRating: 5 },
             { date: '02-09', mood: 4, physicalCondition: 5, painRating: 5 },
