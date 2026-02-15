@@ -9,6 +9,7 @@ app.use(express.json());
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 const scheduledCalls = [];
 
+
 // Make a single call
 app.post('/make-call', async (req, res) => {
     const { phoneNumber } = req.body;

@@ -276,17 +276,152 @@ const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
 const client = twilio(accountSid, authToken);
-const { generateFollowUpQuestion, autoScheduleFromTranscript, extractKeywordsFromTranscript } = require('./openai-calls');
+const { generateFollowUpQuestion, autoScheduleFromTranscript, extractDBColumns, callOpenAI } = require('./openai-calls');
 const { actualPainFromTimeseries } = require('./pain-correction');
-
 const scheduledCalls = [];
-const conversations = new Map();
 const mediaSessions = new Map();
 
-function getRandomGreeting() {
-  const greetings = ["Hi", "Hello", "Hola", "Bonjour"];
-  const randomIndex = Math.floor(Math.random() * greetings.length);
-  return greetings[randomIndex];
+const conversations = new Map();
+const symptomQueue = new Map();
+let dailySchedule = Array.from({ length: 32 }, () => []);
+
+
+function buildSymptomContext() {
+    if (symptomQueue.size === 0) return "No previous symptoms tracked.";
+    
+    let context = "PATIENT SYMPTOM HISTORY:\n\n";
+    const dueToday = dailySchedule[0] || [];
+    
+    if (dueToday.length > 0) {
+        context += "⚠️ SYMPTOMS TO CHECK TODAY:\n";
+        dueToday.forEach(item => {
+            context += `- ${item.symptom.toUpperCase()}: ${item.history.split('\n').pop()}\n`;
+        });
+        context += "\n";
+    }
+    
+    context += "ALL TRACKED SYMPTOMS:\n";
+    Array.from(symptomQueue.entries()).forEach(([symptom, data]) => {
+        context += `\n• ${symptom.toUpperCase()}: Every ${data.frequency} days\n`;
+        context += `  Recent: ${data.history.split('\n').slice(-2).join('\n  ')}\n`;
+    });
+    
+    return context;
+}
+
+async function extractSymptomsFromTranscript(transcript) {
+  try {
+      const result = await callOpenAI(
+          'Extract medical symptoms only. Return JSON: {"symptoms": ["symptom1", "symptom2"]}',
+          `Extract symptoms from:\n${transcript}`
+      );
+      return await consolidateSymptoms(result.symptoms || []);
+  } catch (error) {
+      console.error('Symptom extraction failed:', error.message);
+      return [];
+  }
+}
+
+async function consolidateSymptoms(symptoms) {
+  if (symptoms.length === 0) return [];
+  const existing = Array.from(symptomQueue.keys());
+  
+  try {
+      const result = await callOpenAI(
+          'Consolidate duplicate/similar symptoms. Examples: "headache", "head pain" → "headache". Return JSON: {"consolidated": [{"original": "x", "canonical": "y"}]}',
+          `New: ${symptoms.join(', ')}\nExisting: ${existing.join(', ')}`
+      );
+      
+      const mapping = new Map();
+      result.consolidated?.forEach(({ original, canonical }) => 
+          mapping.set(original.toLowerCase(), canonical.toLowerCase())
+      );
+      
+      return symptoms.map(s => mapping.get(s.toLowerCase()) || s.toLowerCase());
+  } catch (error) {
+      console.error('Consolidation failed:', error.message);
+      return symptoms.map(s => s.toLowerCase());
+  }
+}
+
+function rebuildDailySchedule() {
+  dailySchedule = Array.from({ length: 32 }, () => []);
+  const now = new Date();
+  
+  symptomQueue.forEach((data, symptom) => {
+      const lastChecked = new Date(data.lastChecked);
+      const nextCheck = new Date(lastChecked.getTime() + data.frequency * 30 * 1000);
+      const secondsUntil = (nextCheck - now) / 1000;
+      const daysUntil = Math.floor(secondsUntil / 30);
+      const dayIndex = Math.max(0, Math.min(31, daysUntil));
+      
+      dailySchedule[dayIndex].push({
+          symptom,
+          frequency: data.frequency,
+          lastChecked: data.lastChecked,
+          daysUntil,
+          history: data.history
+      });
+  });
+  
+  printSymptomQueue();
+}
+
+function printSymptomQueue() {
+  console.log('\n========== SYMPTOM PRIORITY QUEUE ==========');
+  Array.from(symptomQueue.entries())
+      .sort((a, b) => a[1].frequency - b[1].frequency)
+      .forEach(([symptom, data]) => {
+          console.log(`📋 ${symptom.toUpperCase()}`);
+          console.log(`   Frequency: Every ${data.frequency} day(s)`);
+          console.log(`   Last Checked: ${new Date(data.lastChecked).toLocaleString()}`);
+          console.log(`   History: ${data.history.split('\n').pop()}\n`);
+      });
+  
+  console.log('========== DAILY SCHEDULE (0-31 DAYS) ==========');
+  dailySchedule.forEach((items, dayIndex) => {
+      if (items.length > 0) {
+          const label = dayIndex === 0 ? 'TODAY/OVERDUE' : dayIndex === 1 ? 'TOMORROW' : `DAY ${dayIndex}`;
+          console.log(`\n📅 ${label}:`);
+          items.forEach(item => {
+              console.log(`   • ${item.symptom} (every ${item.frequency} days)`);
+              if (item.daysUntil < 0) console.log(`     ⚠️  OVERDUE by ${Math.abs(item.daysUntil)} days`);
+          });
+      }
+  });
+  console.log('\n==============================================\n');
+}
+
+async function updateSymptomFrequencies(symptoms, transcript) {
+  if (symptoms.length === 0) return;
+
+  const existingSymptoms = Array.from(symptomQueue.entries()).map(([symptom, data]) => ({
+      symptom, ...data
+  }));
+
+  try {
+      const result = await callOpenAI(
+          `Determine check-in frequencies: Severe 1-3 days, Moderate 7 days, Mild 14 days, Resolved 21-30 days. Return JSON: {"symptoms": [{"name": "x", "frequency": 7, "summary": "y"}]}`,
+          `Conversation:\n${transcript}\n\nSymptoms: ${symptoms.join(', ')}\n\nExisting:\n${JSON.stringify(existingSymptoms, null, 2)}`
+      );
+
+      const now = new Date().toISOString();
+      result.symptoms?.forEach(({ name, frequency, summary }) => {
+          const canonical = name.toLowerCase();
+          const existing = symptomQueue.get(canonical);
+          const historyEntry = `[${new Date().toLocaleDateString()}] ${summary || 'Mentioned'}`;
+          
+          symptomQueue.set(canonical, {
+              frequency: frequency || 7,
+              lastChecked: now,
+              history: existing ? `${existing.history}\n${historyEntry}` : historyEntry
+          });
+      });
+
+      rebuildDailySchedule();
+  } catch (error) {
+      console.error('Frequency update failed:', error.message);
+  }
 }
 
 function freshMediaSession(callSid) {
@@ -374,7 +509,7 @@ app.post('/voice', (req, res) => {
     console.log(`New call started: ${callSid}`);
   }
 
-  const initialGreeting = "Hello! Just checking in. How are you feeling today?";
+  const initialGreeting = "Hello!";
   const mediaUrl = getMediaStreamUrl(callSid);
 
   if (mediaUrl) {
@@ -446,9 +581,10 @@ app.post('/handle-speech', async (req, res) => {
 
   const transcriptArray = conversations.get(callSid);
   const transcriptString = transcriptArray.map(e => `${e.speaker}: ${e.message}`).join('\n');
+  const symptomContext = buildSymptomContext();
 
   try {
-    const aiResponse = await generateFollowUpQuestion(transcriptString);
+    const aiResponse = await generateFollowUpQuestion(transcriptString, symptomContext);
 
     conversations.get(callSid).push({
       speaker: 'AI',
@@ -460,8 +596,7 @@ app.post('/handle-speech', async (req, res) => {
   } catch (error) {
     console.error('Error getting AI response:', error);
 
-    const fallbackResponse = getRandomGreeting();
-    twiml.say({ voice: 'alice' }, fallbackResponse);
+    twiml.say({ voice: 'alice' }, "Sorry, I didn't quite catch that!");
 
     conversations.get(callSid).push({
       speaker: 'AI',
@@ -501,6 +636,33 @@ app.post('/api/actual-pain', (req, res) => {
 });
 
 // Make call
+async function makeTwilioCall(phoneNumber) {
+  try {
+    const response = await fetch(`${PUBLIC_BASE_URL}/make-call`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ phoneNumber })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return {
+      success: data.success,
+      callSid: data.callSid,
+      message: data.message
+    };
+  } catch (error) {
+    console.error(`Error calling ${phoneNumber}:`, error.message);
+    throw error;
+  }
+}
+
 app.post('/make-call', async (req, res) => {
   const { phoneNumber } = req.body;
   if (!phoneNumber) return res.status(400).json({ error: 'Phone number is required' });
@@ -530,9 +692,14 @@ function scheduleRecurringCalls(phoneNumber, frequency, time, endDate) {
 
   let cronExpression;
   switch (frequency) {
-    case 'daily': cronExpression = `${minutes} ${hours} * * *`; break;
-    case 'weekly': cronExpression = `${minutes} ${hours} * * 1`; break;
-    default: throw new Error('Invalid frequency. Use: daily or weekly');
+    case 'daily': 
+      cronExpression = `*/60 * * * * *`; // Every 30 seconds
+      break;
+    case 'weekly': 
+      cronExpression = `${minutes} ${hours} * * 1`; 
+      break;
+    default: 
+      throw new Error('Invalid frequency. Use: daily or weekly');
   }
 
   const callId = `recurring-${Date.now()}`;
@@ -579,8 +746,6 @@ function scheduleRecurringCalls(phoneNumber, frequency, time, endDate) {
 
     console.log(`Scheduled ${frequency} calls at ${time} for ${phoneNumber}`);
 
-    console.log(`Scheduled ${frequency} calls at ${time} for ${phoneNumber}`);
-
     return { success: true, callId };
 }
 
@@ -617,6 +782,11 @@ app.post('/call-status', async (req, res) => {
                 `${entry.speaker}: ${entry.message}`
             ).join('\n');
 
+            const symptoms = await extractSymptomsFromTranscript(transcriptString);
+            console.log(`Extracted symptoms from ${callSid}:`, symptoms);
+            
+            await updateSymptomFrequencies(symptoms, transcriptString);
+
             // Save to DB only when call has ended: one doc = JSON array of [bot question, user response] tuples
             // const pairs = conversationToQAPairs(conversationData);
             if (transcriptCollection && conversationData.length > 0) {
@@ -637,6 +807,7 @@ app.post('/call-status', async (req, res) => {
                                 body_parts: JSON.stringify(features.body_parts || []),
                                 body_part_phrases: JSON.stringify(features.body_part_phrases || []),
                                 daily_mood: features.daily_mood || '',
+                                symptoms: JSON.stringify(symptoms),
                                 estimated_health_metrics: JSON.stringify(features.estimated_health_metrics || {})
                             }]
                         });

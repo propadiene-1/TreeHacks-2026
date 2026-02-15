@@ -9,7 +9,23 @@ const openai = new OpenAI({
 
 /**
  * Generate follow-up question with symptom context
+ * 
  */
+
+async function callOpenAI(systemPrompt, userPrompt) {
+    const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.3
+    });
+    return JSON.parse(response.choices[0].message.content);
+}
+
+
 async function generateFollowUpQuestion(transcript, symptomContext = "") {
     try {
         const response = await openai.chat.completions.create({
@@ -254,7 +270,8 @@ module.exports = {
     generateFollowUpQuestion,
     autoScheduleFromTranscript,
     //extractKeywordsFromTranscript,
-    extractDBColumns
+    extractDBColumns,
+    callOpenAI
 };
 
 /**
