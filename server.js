@@ -231,7 +231,7 @@ app.post('/get-followup', async (req, res) => {
 
 // Schedule one-time call
 // Request format-- phoneNumber: '[number]', scheduledTime: '[YYYY-MM-DDTHH:MM:SS]' (ISO format)
-app.post('/schedule-call', (req, res) => {
+/*app.post('/schedule-call', (req, res) => {
     const { phoneNumber, scheduledTime } = req.body;
     const scheduledDate = new Date(scheduledTime);
     const cronTime = `${scheduledDate.getMinutes()} ${scheduledDate.getHours()} ${scheduledDate.getDate()} ${scheduledDate.getMonth() + 1} *`;
@@ -246,16 +246,17 @@ app.post('/schedule-call', (req, res) => {
     scheduledCalls.push({
         id: callId,
         phoneNumber,
+        scheduledTime: scheduledTime,
         task
     });
 
     res.json({ success: true, message: 'Call scheduled' });
-});
+});*/
 
 // Schedule recurring calls
-// Request format-- phoneNumber: '[number]', frequency: 'daily' or 'weekly', time: 'HH:MM'
+// Request format-- phoneNumber: '[number]', frequency: 'daily' or 'weekly', time: 'HH:MM', endDate: 'YYYY-MM-DDTHH:MM:SS'
 app.post('/schedule-recurring', (req, res) => {
-    const { phoneNumber, frequency, time='09:00' } = req.body; //default to 09:00?
+    const { phoneNumber, frequency, time='09:00' , endDate='2028-05-10T10:00:00'} = req.body; //default time + endDate
     
     if (!phoneNumber || !frequency) {
         return res.status(400).json({ error: 'Phone number and frequency required' });
@@ -277,8 +278,28 @@ app.post('/schedule-recurring', (req, res) => {
                 return res.status(400).json({ error: 'Invalid frequency. Use: daily or weekly' });
         }
 
+        //recurring const containing info
+        const callId = `recurring-${Date.now()}`;
+
         const task = cron.schedule(cronExpression, async () => {
             console.log(`Making recurring call to ${phoneNumber}`);
+
+            //stop all calls after end date
+            if (endDate) {
+                const now = new Date();
+                const end = new Date(endDate);
+                
+                if (now > end) {
+                    console.log(`End date reached for ${phoneNumber}. Stopping calls.`);
+                    task.stop();
+                    
+                    // Remove from scheduledCalls array
+                    const index = scheduledCalls.findIndex(c => c.id === callId);
+                    if (index > -1) scheduledCalls.splice(index, 1);
+                    
+                    return;  // Don't make the call
+                }
+            }
             
             try {
                 const result = await makeTwilioCall(phoneNumber);   //make calls on schedule
@@ -288,14 +309,12 @@ app.post('/schedule-recurring', (req, res) => {
             }
         });
 
-        //recurring const containing info
-        const callId = `recurring-${Date.now()}`;
-
         scheduledCalls.push({
             id: callId,
             phoneNumber,
             frequency,
             time,
+            endDate: endDate || null,
             task
         });
 
@@ -318,9 +337,8 @@ app.get('/scheduled-calls', (req, res) => {
     const calls = scheduledCalls.map(({ id, phoneNumber, scheduledTime, frequency, time }) => ({
         id,
         phoneNumber,
-        scheduledTime,
         frequency,
-        time
+        time,
     }));
     res.json({ calls });
 });
