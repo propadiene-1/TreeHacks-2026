@@ -260,7 +260,6 @@ async function initChroma() {
     transcriptCollection = null;
   }
 }
-initChroma();
 
 // Middleware
 app.use(express.json());
@@ -273,8 +272,7 @@ const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
 const client = twilio(accountSid, authToken);
-
-const { generateFollowUpQuestion, autoScheduleFromTranscript, extractDBColumns } = require('./openai-calls');
+const { generateFollowUpQuestion, autoScheduleFromTranscript, extractKeywordsFromTranscript } = require('./openai-calls');
 const { actualPainFromTimeseries } = require('./pain-correction');
 
 const scheduledCalls = [];
@@ -600,67 +598,58 @@ app.get('/scheduled-calls', (req, res) => {
 
 // Call status webhook: persist call log with new biomarker payload
 app.post('/call-status', async (req, res) => {
-  const callSid = req.body.CallSid;
-  const callStatus = req.body.CallStatus;
-  const patientPhoneNumber = req.body.To || req.body.From || null;
+    const callSid = req.body.CallSid;
+    const callStatus = req.body.CallStatus;
+    const phoneNumber = req.body.From; // Patient's phone number
+    
+    console.log(`Call ${callSid} status: ${callStatus}`);
+    
+    if (callStatus === 'completed') {
+        const conversationData = conversations.get(callSid);
 
-  console.log(`Call ${callSid} status: ${callStatus}`);
+        if (conversationData && conversationData.length > 0) {
+            const transcriptString = conversationData.map(entry =>
+                `${entry.speaker}: ${entry.message}`
+            ).join('\n');
 
-  if (callStatus === 'completed') {
-    const transcriptArray = conversations.get(callSid) || [];
-    const transcriptString = transcriptArray.map(e => `${e.speaker}: ${e.message}`).join('\n');
+            // Save to DB only when call has ended: one doc = JSON array of [bot question, user response] tuples
+            // const pairs = conversationToQAPairs(conversationData);
+            if (transcriptCollection && conversationData.length > 0) {
+                (async () => {
+                    try {
+                        //const keywords = await extractKeywordsFromTranscript(transcriptString);
+                        await transcriptCollection.add({
+                            ids: [`transcript_${callSid}_${Date.now()}`],
+                            documents: [JSON.stringify(conversationData)],
+                            metadatas: [{
+                                callSid,
+                                created_at: new Date().toISOString(),
+                                //created_at_ts: Date.now(),
+                                //pair_count: conversationData.length,
+                                //keywords: keywords.join(', ')
+                                pain_rating,
+                                pain_phrases,
+                                body_parts,
+                                body_part_phrases,
+                                daily_mood,
+                                estimated_health_metrics
+                            }]
+                        });
+                        console.log(`[${callSid}] Saved to ChromaDB on call end (${conversationData.length} Q&A pairs)`);
+                    } catch (err) {
+                        console.warn('ChromaDB save failed:', err.message);
+                    }
+                })();
+            }
 
-    let features = null;
-    if (transcriptString.trim()) {
-      try { features = await extractDBColumns(transcriptString, patientPhoneNumber).catch(() => null); }
-      catch { features = null; }
-    }
-
-    const ms = mediaSessions.get(callSid);
-    const createdAt = new Date().toISOString();
-
-    const callLogObject = {
-      callSid,
-      phoneNumber: patientPhoneNumber,
-      created_at: createdAt,
-      transcript: transcriptArray,
-      extracted: features,
-      biomarkers: {
-        // old visuals need these
-        rmsDbSeries: ms?.rmsDbSeries || [],
-        voicedSeries: ms?.voicedSeries || [],
-        rolling60Series: ms?.rolling60Series || [],
-
-        // keep your existing minimal series too
-        series: ms?.rolling60Series || []
-      },
-      abnormalLog: ms?.abnormalLog || []
-    };
-
-    upsertInMemoryCallLog(callLogObject);
-
-    if (transcriptCollection) {
-      try {
-        await transcriptCollection.add({
-          ids: [`calllog_${callSid}`],
-          documents: [JSON.stringify(callLogObject)],
-          metadatas: [{
-            type: 'call_log',
-            callSid,
-            phoneNumber: patientPhoneNumber,
-            created_at: createdAt
-          }]
-        });
-        console.log(`[${callSid}] Saved call log to ChromaDB`);
-      } catch (e) {
-        console.warn(`[${callSid}] Chroma save failed, still kept in memory:`, e.message);
-      }
-    }
-
-    if (transcriptString.trim()) {
-      autoScheduleFromTranscript(transcriptString, patientPhoneNumber, scheduleRecurringCalls)
-        .catch(() => {});
-    }
+            console.log('Call completed. Auto-scheduling follow-up...');
+            autoScheduleFromTranscript(transcriptString, phoneNumber, scheduleRecurringCalls)
+                .then(result => {
+                    console.log('Auto-scheduled:', result);
+                })
+                .catch(error => {
+                    console.error('Auto-scheduling failed:', error.message);
+                });
 
     conversations.delete(callSid);
     mediaSessions.delete(callSid);
