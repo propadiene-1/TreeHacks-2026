@@ -34,13 +34,125 @@ async function generateFollowUpQuestion(userQuery) {
 }
 
 /**
+ * Extract db information
+ * @param {list} transcript - Full conversation transcript
+ * @param {string} phoneNumber - Patient's phone number
+ */
+
+async function extractDBColumns(transcript, phoneNumber) {
+    try {
+        transcript = transcript.join(" ")
+        
+    } catch (error) {
+        console.error('Auto-scheduling failed:', error);
+        throw error;
+    }
+}
+
+/**
+ * Extract structured medical data from transcript
+ * @param {Array|string} transcript - Full conversation transcript
+ * @param {string} phoneNumber - Patient's phone number
+ * @returns {Object} - Structured medical features
+ */
+async function extractDBColumns(transcript, phoneNumber) {
+    try {
+        // Convert array to string if needed
+        const transcriptText = Array.isArray(transcript) 
+            ? transcript.join("\n") 
+            : transcript;
+        
+        console.log('Extracting medical features from transcript...');
+        
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+                {
+                    role: "system",
+                    content: `You are a medical data extraction assistant. Extract specific features from patient conversation transcripts. Be precise and only extract explicitly mentioned information.`
+                },
+                {
+                    role: "user",
+                    content: `Extract the following from this medical conversation transcript:\n\n${transcriptText}`
+                }
+            ],
+            tools: [
+                {
+                    type: "function",
+                    function: {
+                        name: "extract_medical_features",
+                        description: "Extract structured medical data from patient transcript",
+                        parameters: {
+                            type: "object",
+                            properties: {
+                                pain_rating: {
+                                    type: "number",
+                                    description: "Pain rating from 1-7. ONLY if patient was explicitly asked and responded with a number. If range given, return average. Return null if not asked/answered.",
+                                    nullable: true,
+                                    minimum: 1,
+                                    maximum: 7
+                                },
+                                pain_phrases: {
+                                    type: "array",
+                                    items: { type: "string" },
+                                    description: "List of exact phrases related to pain (e.g., 'sharp pain in chest', 'dull ache', 'throbbing headache')"
+                                },
+                                body_parts: {
+                                    type: "array",
+                                    items: { type: "string" },
+                                    description: "Body parts mentioned (e.g., 'head', 'upper right thigh', 'left foot', 'stomach', 'chest', 'throat')"
+                                },
+                                body_part_phrases: {
+                                    type: "array",
+                                    items: { type: "string" },
+                                    description: "Full phrases where body parts are mentioned (e.g., 'pain in my chest', 'my left foot is swollen', 'pressure on upper right thigh')"
+                                },
+                                daily_mood: {
+                                    type: "string",
+                                    description: "Overall sentiment/mood in 2-5 words (e.g., 'worried and stressed', 'calm but tired', 'anxious about symptoms')"
+                                },
+                                estimated_health_metrics: {
+                                    type: "object",
+                                    description: "Physical health measurements mentioned or estimated (e.g. body temperature--(e.g. 98.6°F, fever, normal), blood pressure-- (e.g. 00, 120/80, high, normal), heart rate -- (e.g. 72 bpm, racing, normal)), any other physical measurements mentioned",
+                                }
+                            },
+                            required: ["pain_rating", "pain_phrases", "symptom_keywords", "symptom_phrases", "body_parts", "body_part_phrases", "daily_mood", "estimated_health_metrics"]
+                        }
+                    }
+                }
+            ],
+        });
+
+        // Extract the function call result
+        const toolCall = response.choices[0].message.tool_calls[0];
+        const extractedData = JSON.parse(toolCall.function.arguments);
+        
+        // Add metadata
+        const result = {
+            phoneNumber: phoneNumber,
+            timestamp: new Date().toISOString(),
+            ...extractedData
+        };
+        
+        console.log('Medical features extracted:', result);
+        
+        return result;
+        
+    } catch (error) {
+        console.error('Feature extraction failed:', error);
+        throw error;
+    }
+}
+
+/**
  * Auto-schedule follow-up calls from conversation transcript
- * @param {string} transcript - Full conversation transcript
+ * @param {list} transcript - Full conversation transcript
  * @param {string} phoneNumber - Patient's phone number
  * @param {Function} scheduleFunction - scheduleRecurringCalls function from server.js
  */
 async function autoScheduleFromTranscript(transcript, phoneNumber, scheduleFunction) {
     try {
+        transcript = transcript.join(" ")
         console.log('Auto-scheduling for:', phoneNumber);
         
         // Call OpenAI to determine optimal schedule
@@ -207,6 +319,7 @@ async function analyzeTranscript(transcript) {
 module.exports = {
     generateFollowUpQuestion,
     autoScheduleFromTranscript,
-    extractKeywordsFromTranscript
+    extractKeywordsFromTranscript,
+    extractDBColumns
     //analyzeTranscript
 };
