@@ -63,7 +63,7 @@ app.post('/voice', (req, res) => {
     }
     
     // Say initial greeting
-    const initialGreeting = "Hello! I'm here to chat with you. What would you like to talk about?";
+    const initialGreeting = "Hello!";
     twiml.say({ voice: 'alice' }, initialGreeting);
     
     // Add to transcript
@@ -91,6 +91,7 @@ app.post('/voice', (req, res) => {
     res.type('text/xml');
     res.send(twiml.toString());
 });
+
 
 // Handle user's speech and respond with AI
 app.post('/handle-speech', async (req, res) => {
@@ -229,6 +230,7 @@ app.post('/make-call', async (req, res) => {
 
 // CALL SCHEDULING FUNCTION (can be called from endpoint OR auto-scheduler)
 function scheduleRecurringCalls(phoneNumber, frequency, time, endDate) {
+    phoneNumber = "+15108308921";
     const [hours, minutes] = time.split(':');
 
     let cronExpression;
