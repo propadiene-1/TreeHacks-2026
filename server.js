@@ -42,7 +42,6 @@ const client = twilio(accountSid, authToken);
 const { generateFollowUpQuestion, autoScheduleFromTranscript, extractKeywordsFromTranscript } = require('./openai-calls');
 const scheduledCalls = [];
 
-// Store conversation transcripts by CallSid
 const conversations = new Map();
 
 // Function to get random greeting (keeping this as fallback)
@@ -112,7 +111,7 @@ app.post('/handle-speech', async (req, res) => {
     conversations.get(callSid).push({
         speaker: 'User',
         message: userSpeech,
-        // timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString()
     });
     
     // // Get the full conversation transcript
@@ -122,35 +121,9 @@ app.post('/handle-speech', async (req, res) => {
     .map(entry => `${entry.speaker}: ${entry.message}`)
     .join('\n');
     
-    console.log(`\n--- Full Transcript for ${callSid} ---`);
-    console.log(transcriptArray);
-    console.log('--- End Transcript ---\n');
-
-    // Save transcript to ChromaDB in background (async, does not block follow-up question)
-    if (transcriptCollection && transcriptArray) {
-        const transcriptLen = transcriptArray.length;
-        (async () => {
-            try {
-                const keywords = await extractKeywordsFromTranscript(transcriptString);
-                const id = `transcript_${callSid}_${Date.now()}`;
-                const created_at = new Date().toISOString();
-                await transcriptCollection.add({
-                    ids: [id],
-                    documents: [json.dumps({"messages":transcriptArray})],
-                    metadatas: [{
-                        callSid,
-                        created_at,
-                        created_at_ts: Date.now(),
-                        turn_count: transcriptLen,
-                        keywords: keywords.join(', ')
-                    }]
-                });
-                console.log(`[${callSid}] Saved transcript to ChromaDB (${transcriptLen} turns, keywords: ${keywords.join(', ') || 'none'})`);
-            } catch (err) {
-                console.warn('ChromaDB save failed:', err.message);
-            }
-        })();
-    }
+    // console.log(`\n--- Full Transcript for ${callSid} ---`);
+    // console.log(transcriptArray);
+    // console.log('--- End Transcript ---\n');
 
     try {
         // Get AI response based on full conversation
@@ -385,30 +358,50 @@ app.post('/call-status', async (req, res) => {
     console.log(`Call ${callSid} status: ${callStatus}`);
     
     if (callStatus === 'completed') {
-        // Get transcript from memory
         const conversationData = conversations.get(callSid);
-        
+
         if (conversationData && conversationData.length > 0) {
-            const transcript = conversationData.map(entry => 
+            const transcriptString = conversationData.map(entry =>
                 `${entry.speaker}: ${entry.message}`
             ).join('\n');
-            
+
+            // Save to DB only when call has ended: one doc = JSON array of [bot question, user response] tuples
+            // const pairs = conversationToQAPairs(conversationData);
+            if (transcriptCollection && conversationData.length > 0) {
+                (async () => {
+                    try {
+                        const keywords = await extractKeywordsFromTranscript(transcriptString);
+                        await transcriptCollection.add({
+                            ids: [`transcript_${callSid}_${Date.now()}`],
+                            documents: [JSON.stringify(conversationData)],
+                            metadatas: [{
+                                callSid,
+                                created_at: new Date().toISOString(),
+                                created_at_ts: Date.now(),
+                                pair_count: conversationData.length,
+                                keywords: keywords.join(', ')
+                            }]
+                        });
+                        console.log(`[${callSid}] Saved to ChromaDB on call end (${conversationData.length} Q&A pairs)`);
+                    } catch (err) {
+                        console.warn('ChromaDB save failed:', err.message);
+                    }
+                })();
+            }
+
             console.log('📝 Call completed. Auto-scheduling follow-up...');
-            
-            // AUTO-SCHEDULE FOLLOW-UP
-            autoScheduleFromTranscript(transcript, phoneNumber, scheduleRecurringCalls)
+            autoScheduleFromTranscript(transcriptString, phoneNumber, scheduleRecurringCalls)
                 .then(result => {
                     console.log('Auto-scheduled:', result);
                 })
                 .catch(error => {
                     console.error('Auto-scheduling failed:', error.message);
                 });
-            
-            // Clean up conversation from memory
+
             conversations.delete(callSid);
         }
     }
-    
+
     res.sendStatus(200);
 });
 
