@@ -205,54 +205,6 @@ app.post('/make-call', async (req, res) => {
     }
 });
 
-// Get AI follow-up question (keeping this for web interface)
-app.post('/get-followup', async (req, res) => {
-    const { query } = req.body;
-    
-    if (!query) {
-        return res.status(400).json({ error: 'Query is required' });
-    }
-    
-    try {
-        const followUpQuestion = await generateFollowUpQuestion(query);
-        
-        res.json({
-            success: true,
-            followUpQuestion: followUpQuestion
-        });
-    } catch (error) {
-        console.error('Error generating follow-up:', error);
-        res.status(500).json({ 
-            error: 'Failed to generate follow-up question',
-            details: error.message 
-        });
-    }
-});
-
-// Schedule one-time call
-// Request format-- phoneNumber: '[number]', scheduledTime: '[YYYY-MM-DDTHH:MM:SS]' (ISO format)
-/*app.post('/schedule-call', (req, res) => {
-    const { phoneNumber, scheduledTime } = req.body;
-    const scheduledDate = new Date(scheduledTime);
-    const cronTime = `${scheduledDate.getMinutes()} ${scheduledDate.getHours()} ${scheduledDate.getDate()} ${scheduledDate.getMonth() + 1} *`;
-    
-    const task = cron.schedule(cronTime, async () => {
-        await makeTwilioCall(phoneNumber);
-        task.stop();
-    });
-
-    const callId = `one-time-${Date.now()}`;
-    
-    scheduledCalls.push({
-        id: callId,
-        phoneNumber,
-        scheduledTime: scheduledTime,
-        task
-    });
-
-    res.json({ success: true, message: 'Call scheduled' });
-});*/
-
 // CALL SCHEDULING FUNCTION (can be called from endpoint OR auto-scheduler)
 function scheduleRecurringCalls(phoneNumber, frequency, time, endDate) {
     const [hours, minutes] = time.split(':');
@@ -414,3 +366,51 @@ app.post('/call-status', async (req, res) => {
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
 });
+
+// Get AI follow-up question (keeping this for web interface)
+/*app.post('/get-followup', async (req, res) => {
+    const { query } = req.body;
+    
+    if (!query) {
+        return res.status(400).json({ error: 'Query is required' });
+    }
+    
+    try {
+        const followUpQuestion = await generateFollowUpQuestion(query);
+        
+        res.json({
+            success: true,
+            followUpQuestion: followUpQuestion
+        });
+    } catch (error) {
+        console.error('Error generating follow-up:', error);
+        res.status(500).json({ 
+            error: 'Failed to generate follow-up question',
+            details: error.message 
+        });
+    }
+});*/
+
+// Schedule one-time call
+// Request format-- phoneNumber: '[number]', scheduledTime: '[YYYY-MM-DDTHH:MM:SS]' (ISO format)
+/*app.post('/schedule-call', (req, res) => {
+    const { phoneNumber, scheduledTime } = req.body;
+    const scheduledDate = new Date(scheduledTime);
+    const cronTime = `${scheduledDate.getMinutes()} ${scheduledDate.getHours()} ${scheduledDate.getDate()} ${scheduledDate.getMonth() + 1} *`;
+    
+    const task = cron.schedule(cronTime, async () => {
+        await makeTwilioCall(phoneNumber);
+        task.stop();
+    });
+
+    const callId = `one-time-${Date.now()}`;
+    
+    scheduledCalls.push({
+        id: callId,
+        phoneNumber,
+        scheduledTime: scheduledTime,
+        task
+    });
+
+    res.json({ success: true, message: 'Call scheduled' });
+});*/
