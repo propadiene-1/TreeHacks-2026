@@ -1,10 +1,32 @@
 const express = require('express');
 const twilio = require('twilio');
 const cron = require('node-cron');  //node-cron for scheduling
+const { CloudClient } = require('chromadb');
 require('dotenv').config();
 
 const app = express();
 const port = 3000;
+
+const chroma = new CloudClient({
+  apiKey: process.env.CHROMA_API_KEY,
+  tenant: process.env.CHROMA_TENANT,
+  database: 'second'
+});
+let transcriptCollection;
+
+async function initChroma() {
+    try {
+        transcriptCollection = await chroma.getOrCreateCollection({
+            name: 'call_transcripts',
+            metadata: { 'hnsw:space': 'cosine' }
+        });
+        console.log('ChromaDB ready (call_transcripts)');
+    } catch (err) {
+        console.warn('ChromaDB not available, transcripts will not be persisted:', err.message);
+        transcriptCollection = null;
+    }
+}
+initChroma();
 
 // Middleware
 app.use(express.json());
@@ -17,7 +39,7 @@ const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
 const client = twilio(accountSid, authToken);
-const { generateFollowUpQuestion, autoScheduleFromTranscript } = require('./openai-calls');
+const { generateFollowUpQuestion, autoScheduleFromTranscript, extractKeywordsFromTranscript } = require('./medsek-chat');
 const scheduledCalls = [];
 
 // Store conversation transcripts by CallSid
@@ -102,7 +124,33 @@ app.post('/handle-speech', async (req, res) => {
     console.log(`\n--- Full Transcript for ${callSid} ---`);
     console.log(transcriptString);
     console.log('--- End Transcript ---\n');
-    
+
+    // Save transcript to ChromaDB in background (async, does not block follow-up question)
+    if (transcriptCollection && transcriptString) {
+        const transcriptLen = transcript.length;
+        (async () => {
+            try {
+                const keywords = await extractKeywordsFromTranscript(transcriptString);
+                const id = `transcript_${callSid}_${Date.now()}`;
+                const created_at = new Date().toISOString();
+                await transcriptCollection.add({
+                    ids: [id],
+                    documents: [transcriptString],
+                    metadatas: [{
+                        callSid,
+                        created_at,
+                        created_at_ts: Date.now(),
+                        turn_count: transcriptLen,
+                        keywords: keywords.join(', ')
+                    }]
+                });
+                console.log(`[${callSid}] Saved transcript to ChromaDB (${transcriptLen} turns, keywords: ${keywords.join(', ') || 'none'})`);
+            } catch (err) {
+                console.warn('ChromaDB save failed:', err.message);
+            }
+        })();
+    }
+
     try {
         // Get AI response based on full conversation
         const aiResponse = await generateFollowUpQuestion(transcriptString);
