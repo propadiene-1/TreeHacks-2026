@@ -39,7 +39,7 @@ const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
 const client = twilio(accountSid, authToken);
-const { generateFollowUpQuestion, autoScheduleFromTranscript, extractKeywordsFromTranscript } = require('./medsek-chat');
+const { generateFollowUpQuestion, autoScheduleFromTranscript, extractKeywordsFromTranscript } = require('./openai-calls');
 const scheduledCalls = [];
 
 // Store conversation transcripts by CallSid
@@ -105,29 +105,30 @@ app.post('/handle-speech', async (req, res) => {
     if (!conversations.has(callSid)) {
         conversations.set(callSid, []);
     }
+
+    console.log('conversations', conversations)
     
     // Add user's speech to transcript
     conversations.get(callSid).push({
         speaker: 'User',
         message: userSpeech,
-        timestamp: new Date().toISOString()
+        // timestamp: new Date().toISOString()
     });
     
-    // Get the full conversation transcript
-    const transcript = conversations.get(callSid);
+    // // Get the full conversation transcript
+    const transcriptArray = conversations.get(callSid);
     
-    // Format transcript as a string for the AI
-    const transcriptString = transcript.map(entry => 
-        `${entry.speaker}: ${entry.message}`
-    ).join('\n');
+    const transcriptString = transcriptArray
+    .map(entry => `${entry.speaker}: ${entry.message}`)
+    .join('\n');
     
     console.log(`\n--- Full Transcript for ${callSid} ---`);
-    console.log(transcriptString);
+    console.log(transcriptArray);
     console.log('--- End Transcript ---\n');
 
     // Save transcript to ChromaDB in background (async, does not block follow-up question)
-    if (transcriptCollection && transcriptString) {
-        const transcriptLen = transcript.length;
+    if (transcriptCollection && transcriptArray) {
+        const transcriptLen = transcriptArray.length;
         (async () => {
             try {
                 const keywords = await extractKeywordsFromTranscript(transcriptString);
@@ -135,7 +136,7 @@ app.post('/handle-speech', async (req, res) => {
                 const created_at = new Date().toISOString();
                 await transcriptCollection.add({
                     ids: [id],
-                    documents: [transcriptString],
+                    documents: [json.dumps({"messages":transcriptArray})],
                     metadatas: [{
                         callSid,
                         created_at,
@@ -155,7 +156,7 @@ app.post('/handle-speech', async (req, res) => {
         // Get AI response based on full conversation
         const aiResponse = await generateFollowUpQuestion(transcriptString);
         
-        console.log(`[${callSid}] AI responds: ${aiResponse}`);
+        // console.log(`[${callSid}] AI responds: ${aiResponse}`);
         
         // Add AI response to transcript
         conversations.get(callSid).push({
