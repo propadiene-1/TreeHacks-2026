@@ -559,13 +559,13 @@
     }
 
     const sampleTimeseries = [
-      { date: '02-08', mood: 5, physicalCondition: 4, painRating: 5 },
-      { date: '02-09', mood: 4, physicalCondition: 5, painRating: 5 },
-      { date: '02-10', mood: 6, physicalCondition: 5, painRating: 4 },
-      { date: '02-11', mood: 5, physicalCondition: 4, painRating: 5 },
-      { date: '02-12', mood: 7, physicalCondition: 6, painRating: 3 },
-      { date: '02-13', mood: 6, physicalCondition: 6, painRating: 4 },
-      { date: '02-14', mood: 6, physicalCondition: 5, painRating: 4 }
+        { date: '02-08', mood: 5, physicalCondition: 4, painRating: 5, daysSinceOnset: 300 },
+        { date: '02-09', mood: 4, physicalCondition: 5, painRating: 5, daysSinceOnset: 301 },
+        { date: '02-10', mood: 6, physicalCondition: 5, painRating: 4, daysSinceOnset: 302 },
+        { date: '02-11', mood: 5, physicalCondition: 4, painRating: 5, daysSinceOnset: 303 },
+        { date: '02-12', mood: 7, physicalCondition: 6, painRating: 3, daysSinceOnset: 304 },
+        { date: '02-13', mood: 6, physicalCondition: 6, painRating: 4, daysSinceOnset: 305 },
+        { date: '02-14', mood: 6, physicalCondition: 5, painRating: 4, daysSinceOnset: 306 }
     ];
     createPainLineGraph('painChart', sampleTimeseries);
 
