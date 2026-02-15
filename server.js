@@ -17,7 +17,7 @@ const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
 const client = twilio(accountSid, authToken);
-const { generateFollowUpQuestion } = require('./medsek-chat');
+const { generateFollowUpQuestion, autoScheduleFromTranscript } = require('./openai-calls');
 const scheduledCalls = [];
 
 // Store conversation transcripts by CallSid
@@ -253,74 +253,81 @@ app.post('/get-followup', async (req, res) => {
     res.json({ success: true, message: 'Call scheduled' });
 });*/
 
-// Schedule recurring calls
+// CALL SCHEDULING FUNCTION (can be called from endpoint OR auto-scheduler)
+function scheduleRecurringCalls(phoneNumber, frequency, time, endDate) {
+    const [hours, minutes] = time.split(':');
+
+    let cronExpression;
+    
+    switch(frequency) {
+        case 'daily':
+            cronExpression = `${minutes} ${hours} * * *`;
+            break;
+        case 'weekly':
+            cronExpression = `${minutes} ${hours} * * 1`;
+            break;
+        default:
+            throw new Error('Invalid frequency. Use: daily or weekly');
+    }
+
+    const callId = `recurring-${Date.now()}`;
+
+    const task = cron.schedule(cronExpression, async () => {
+        console.log(`Making recurring call to ${phoneNumber}`);
+
+        // Stop all calls after end date
+        if (endDate) {
+            const now = new Date();
+            const end = new Date(endDate);
+            
+            if (now > end) {
+                console.log(`End date reached for ${phoneNumber}. Stopping calls.`);
+                task.stop();
+                
+                const index = scheduledCalls.findIndex(c => c.id === callId);
+                if (index > -1) scheduledCalls.splice(index, 1);
+                
+                return;
+            }
+        }
+        
+        try {
+            const result = await makeTwilioCall(phoneNumber);
+            console.log(`Recurring call initiated: ${result.callSid}`);
+        } catch (error) {
+            console.error(`Failed to make recurring call: ${error.message}`);
+        }
+    });
+
+    scheduledCalls.push({
+        id: callId,
+        phoneNumber,
+        frequency,
+        time,
+        endDate: endDate || null,
+        task
+    });
+
+    console.log(`Scheduled ${frequency} calls at ${time} for ${phoneNumber}`);
+
+    return { success: true, callId };
+}
+
+// scheduling endpoint (can be used from web app)
 // Request format-- phoneNumber: '[number]', frequency: 'daily' or 'weekly', time: 'HH:MM', endDate: 'YYYY-MM-DDTHH:MM:SS'
 app.post('/schedule-recurring', (req, res) => {
-    const { phoneNumber, frequency, time='09:00' , endDate='2028-05-10T10:00:00'} = req.body; //default time + endDate
+    const { phoneNumber, frequency, time = '09:00', endDate } = req.body;
     
     if (!phoneNumber || !frequency) {
         return res.status(400).json({ error: 'Phone number and frequency required' });
     }
     
     try {
-        const [hours, minutes] = time.split(':');
-
-        let cronExpression; //hold cron string
-    
-        switch(frequency) { //basically if-else
-            case 'daily':
-                cronExpression = `${minutes} ${hours} * * *`;
-                break;
-            case 'weekly':
-                cronExpression = `${minutes} ${hours} * * 1`;  //default to every monday
-                break;
-            default:
-                return res.status(400).json({ error: 'Invalid frequency. Use: daily or weekly' });
-        }
-
-        //recurring const containing info
-        const callId = `recurring-${Date.now()}`;
-
-        const task = cron.schedule(cronExpression, async () => {
-            console.log(`Making recurring call to ${phoneNumber}`);
-
-            //stop all calls after end date
-            if (endDate) {
-                const now = new Date();
-                const end = new Date(endDate);
-                
-                if (now > end) {
-                    console.log(`End date reached for ${phoneNumber}. Stopping calls.`);
-                    task.stop();
-                    
-                    // Remove from scheduledCalls array
-                    const index = scheduledCalls.findIndex(c => c.id === callId);
-                    if (index > -1) scheduledCalls.splice(index, 1);
-                    
-                    return;  // Don't make the call
-                }
-            }
-            
-            try {
-                const result = await makeTwilioCall(phoneNumber);   //make calls on schedule
-                console.log(`Recurring call initiated: ${result.callSid}`);
-            } catch (error) {
-                console.error(`Failed to make recurring call: ${error.message}`);
-            }
-        });
-
-        scheduledCalls.push({
-            id: callId,
-            phoneNumber,
-            frequency,
-            time,
-            endDate: endDate || null,
-            task
-        });
-
+        const result = scheduleRecurringCalls(phoneNumber, frequency, time, endDate);
+        
         res.json({
             success: true,
-            callId,
+            callId: result.callId,
             message: `Recurring ${frequency} calls scheduled`
         });
 
@@ -350,7 +357,9 @@ async function makeTwilioCall(phoneNumber) {
         const call = await client.calls.create({
             url: `${serverUrl}/voice`,
             to: phoneNumber,
-            from: twilioPhoneNumber
+            from: twilioPhoneNumber,
+            statusCallback: `${serverUrl}/call-status`,  // ← Add this
+            statusCallbackEvent: ['completed']           // ← Add this
         });
         
         console.log(`Call initiated: ${call.sid}`);
@@ -365,6 +374,42 @@ async function makeTwilioCall(phoneNumber) {
         throw error;
     }
 }
+
+// TWILIO WEBHOOK: Auto-schedule when call ends
+app.post('/call-status', async (req, res) => {
+    const callSid = req.body.CallSid;
+    const callStatus = req.body.CallStatus;
+    const phoneNumber = req.body.From; // Patient's phone number
+    
+    console.log(`Call ${callSid} status: ${callStatus}`);
+    
+    if (callStatus === 'completed') {
+        // Get transcript from memory
+        const conversationData = conversations.get(callSid);
+        
+        if (conversationData && conversationData.length > 0) {
+            const transcript = conversationData.map(entry => 
+                `${entry.speaker}: ${entry.message}`
+            ).join('\n');
+            
+            console.log('📝 Call completed. Auto-scheduling follow-up...');
+            
+            // AUTO-SCHEDULE FOLLOW-UP
+            autoScheduleFromTranscript(transcript, phoneNumber, scheduleRecurringCalls)
+                .then(result => {
+                    console.log('Auto-scheduled:', result);
+                })
+                .catch(error => {
+                    console.error('Auto-scheduling failed:', error.message);
+                });
+            
+            // Clean up conversation from memory
+            conversations.delete(callSid);
+        }
+    }
+    
+    res.sendStatus(200);
+});
 
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
