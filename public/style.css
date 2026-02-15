@@ -5,129 +5,238 @@
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    /*background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);*/
-    background: white;
-    min-height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    font-family: 'Nunito', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+    background: #a8d5e2;
+}
+
+.wave-container {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.wave {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    opacity: 0.6;
+}
+
+.wave1 {
+    background: linear-gradient(180deg, 
+        #d4e7ed 0%, 
+        #b8dce8 25%, 
+        #9dcee0 50%, 
+        #82c0d8 75%, 
+        #6fb3ce 100%);
+    clip-path: polygon(
+        0 0, 
+        100% 0, 
+        100% 75%, 
+        75% 78%, 
+        50% 72%, 
+        25% 76%, 
+        0 70%
+    );
+    z-index: 1;
+}
+
+.wave2 {
+    background: linear-gradient(180deg, 
+        #9dcee0 0%, 
+        #82c0d8 33%, 
+        #6fb3ce 66%, 
+        #5ca4c4 100%);
+    clip-path: polygon(
+        0 68%, 
+        25% 74%, 
+        50% 70%, 
+        75% 76%, 
+        100% 73%, 
+        100% 100%, 
+        0 100%
+    );
+    z-index: 2;
+}
+
+.wave3 {
+    background: linear-gradient(180deg, 
+        #6fb3ce 0%, 
+        #5ca4c4 40%, 
+        #4995ba 70%, 
+        #3686b0 100%);
+    clip-path: polygon(
+        0 75%, 
+        20% 78%, 
+        40% 73%, 
+        60% 77%, 
+        80% 74%, 
+        100% 78%, 
+        100% 100%, 
+        0 100%
+    );
+    z-index: 3;
+    opacity: 0.8;
+}
+
+.wave4 {
+    background: linear-gradient(180deg, 
+        #4995ba 0%, 
+        #3686b0 50%, 
+        #2477a6 100%);
+    clip-path: polygon(
+        0 82%, 
+        15% 85%, 
+        35% 80%, 
+        55% 84%, 
+        75% 81%, 
+        90% 85%, 
+        100% 83%, 
+        100% 100%, 
+        0 100%
+    );
+    z-index: 4;
+    opacity: 0.9;
 }
 
 .container {
-    background: white;
-    padding: 40px;
-    border: 2px solid black;
-    border-radius: 20px;
-    /*box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);*/
+    position: relative;
+    z-index: 10;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.content-box {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 24px;
+    padding: 60px 50px;
+    box-shadow: 
+        0 20px 60px rgba(54, 134, 176, 0.3),
+        0 10px 30px rgba(54, 134, 176, 0.2);
     text-align: center;
-    max-width: 400px;
-    width: 90%;
+    max-width: 450px;
+    width: 100%;
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.8);
 }
 
 h1 {
-    color: #333;
+    font-size: 3.5rem;
+    font-weight: 700;
+    color: #2477a6;
+    margin-bottom: 40px;
+    letter-spacing: -1px;
+    text-transform: lowercase;
+}
+
+.input-group {
     margin-bottom: 30px;
-    font-size: 2em;
 }
 
 input[type="tel"] {
     width: 100%;
-    padding: 15px;
-    font-size: 16px;
-    border: 2px solid #ddd;
-    border-radius: 10px;
-    margin-bottom: 20px;
-    transition: border-color 0.3s;
+    padding: 18px 24px;
+    font-size: 1rem;
+    font-family: 'Nunito', sans-serif;
+    border: 2px solid #b8dce8;
+    border-radius: 12px;
+    outline: none;
+    transition: all 0.3s ease;
+    background: #f8fcfd;
+    color: #2477a6;
+}
+
+input[type="tel"]::placeholder {
+    color: #82c0d8;
+    opacity: 0.8;
 }
 
 input[type="tel"]:focus {
-    outline: none;
-    border-color: #667eea;
+    border-color: #5ca4c4;
+    background: #ffffff;
+    box-shadow: 0 4px 16px rgba(92, 164, 196, 0.2);
 }
 
-button {
+.button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.btn {
     width: 100%;
-    padding: 15px 30px;
-    font-size: 18px;
-    font-weight: bold;
-    color: white;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 18px 32px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    font-family: 'Nunito', sans-serif;
     border: none;
-    border-radius: 10px;
+    border-radius: 12px;
     cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: all 0.3s ease;
+    text-transform: capitalize;
+    letter-spacing: 0.5px;
 }
 
-button:hover {
+.btn-primary {
+    background: linear-gradient(135deg, #5ca4c4 0%, #3686b0 100%);
+    color: white;
+    box-shadow: 0 6px 20px rgba(54, 134, 176, 0.3);
+}
+
+.btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 8px 25px rgba(54, 134, 176, 0.4);
+    background: linear-gradient(135deg, #6fb3ce 0%, #4995ba 100%);
 }
 
-button:active {
+.btn-primary:active {
     transform: translateY(0);
 }
 
-button:disabled {
-    background: #ccc;
-    cursor: not-allowed;
-    transform: none;
+.btn-secondary {
+    background: transparent;
+    color: #3686b0;
+    border: 2px solid #82c0d8;
+    box-shadow: 0 4px 12px rgba(130, 192, 216, 0.2);
+}
+
+.btn-secondary:hover {
+    background: rgba(130, 192, 216, 0.1);
+    border-color: #5ca4c4;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(130, 192, 216, 0.3);
+}
+
+.btn-secondary:active {
+    transform: translateY(0);
 }
 
 #status {
     margin-top: 20px;
-    padding: 10px;
-    border-radius: 5px;
+    font-size: 0.95rem;
+    color: #4995ba;
+    min-height: 24px;
     font-weight: 500;
 }
 
-.success {
-    background-color: #d4edda;
-    color: #155724;
-}
-
-.error {
-    background-color: #f8d7da;
-    color: #721c24;
-}
-
-.info {
-    background-color: #d1ecf1;
-    color: #0c5460;
-}
-
-/*AI FOLLOW UP STUFF*/
-
-#aiResponse{
-    color: black;
-    background-color: transparent;
-    font-size: large;
-}
-.ai-section {
-    margin-top: 30px;
-    padding-top: 30px;
-    border-top: 2px solid #eee;
-}
-
-.ai-section h2 {
-    color: #333;
-    font-size: 1.3em;
-    margin-bottom: 15px;
-}
-
-textarea {
-    width: 100%;
-    padding: 15px;
-    font-size: 16px;
-    border: 2px solid #ddd;
-    border-radius: 10px;
-    margin-bottom: 15px;
-    min-height: 80px;
-    font-family: inherit;
-    resize: vertical;
-}
-
-textarea:focus {
-    outline: none;
-    border-color: #667eea;
+@media (max-width: 480px) {
+    .content-box {
+        padding: 40px 30px;
+    }
+    
+    h1 {
+        font-size: 2.8rem;
+    }
+    
+    .btn {
+        padding: 16px 28px;
+        font-size: 1rem;
+    }
 }
