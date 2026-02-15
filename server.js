@@ -1,3 +1,6 @@
+const http = require('http');
+const WebSocket = require('ws');
+
 const express = require('express');
 const twilio = require('twilio');
 const cron = require('node-cron');  //node-cron for scheduling
@@ -5,8 +8,24 @@ const { CloudClient } = require('chromadb');
 require('dotenv').config();
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
+const PUBLIC_BASE_URL =
+  process.env.PUBLIC_BASE_URL ||
+  process.env.SERVER_URL ||
+  `http://127.0.0.1:${port}`;
+
+const PUBLIC_WSS_URL = process.env.PUBLIC_WSS_URL || null;
+
+function absUrl(path) {
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  return `${PUBLIC_BASE_URL}${path}`;
+}
+
+function getMediaStreamUrl(callSid) {
+  if (!PUBLIC_WSS_URL) return null;
+  return `${PUBLIC_WSS_URL}/media-stream?callSid=${encodeURIComponent(callSid)}`;
+}
 const chroma = new CloudClient({
   apiKey: process.env.CHROMA_API_KEY,
   tenant: process.env.CHROMA_TENANT,
@@ -56,6 +75,7 @@ const { actualPainFromTimeseries } = require('./pain-correction');
 const scheduledCalls = [];
 
 const conversations = new Map();
+const mediaSessions = new Map();
 
 // Function to get random greeting (keeping this as fallback)
 function getRandomGreeting() {
@@ -77,6 +97,25 @@ app.post('/voice', (req, res) => {
     
     // Say initial greeting
     const initialGreeting = "Hello! Just checking in. How are you feeling today?";
+    const mediaUrl = getMediaStreamUrl(callSid);
+    if (mediaUrl) {
+      twiml.start().stream({ url: mediaUrl });
+
+      if (!mediaSessions.has(callSid)) {
+        mediaSessions.set(callSid, {
+          callSid,
+          wsConnected: false,
+          startedAt: Date.now(),
+          lastMediaAt: null,
+          mediaFrames: 0,
+          streamSid: null
+        });
+      }
+
+      console.log(`[${callSid}] Media Stream enabled -> ${mediaUrl}`);
+    } else {
+      console.warn(`[${callSid}] Media Stream NOT enabled (PUBLIC_WSS_URL not set)`);
+    }
     twiml.say({ voice: 'alice' }, initialGreeting);
     
     // Add to transcript
@@ -89,7 +128,7 @@ app.post('/voice', (req, res) => {
     // Gather user's speech response
     const gather = twiml.gather({
         input: 'speech',
-        action: '/handle-speech',
+        action: absUrl('/handle-speech'),
         method: 'POST',
         speechTimeout: 'auto',
         language: 'en-US'
@@ -99,7 +138,7 @@ app.post('/voice', (req, res) => {
     twiml.say({ voice: 'alice' }, 'Are you still there?');
     
     // Redirect back to keep the conversation going
-    twiml.redirect('/voice');
+    twiml.redirect({ method: 'POST' }, absUrl('/voice'));
     
     res.type('text/xml');
     res.send(twiml.toString());
@@ -387,7 +426,7 @@ app.post('/api/actual-pain', (req, res) => {
 
 async function makeTwilioCall(phoneNumber) {
     try {
-        const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
+        const serverUrl = PUBLIC_BASE_URL;
         
         const call = await client.calls.create({
             url: `${serverUrl}/voice`,
@@ -500,8 +539,88 @@ app.post('/call-status', async (req, res) => {
     }
 });*/
 
-app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
+const server = http.createServer(app);
+
+const wss = new WebSocket.Server({ server, path: '/media-stream' });
+
+wss.on('connection', (ws, req) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  let callSid = url.searchParams.get('callSid') || null;
+
+  ws.on('message', (msg) => {
+    let data;
+    try {
+      data = JSON.parse(msg.toString());
+    } catch {
+      return;
+    }
+
+    const event = data.event;
+
+    if (event === 'start') {
+      callSid = data?.start?.callSid || callSid;
+      const streamSid = data?.start?.streamSid;
+
+      if (callSid) {
+        const s = mediaSessions.get(callSid) || {
+          callSid,
+          wsConnected: true,
+          startedAt: Date.now(),
+          lastMediaAt: null,
+          mediaFrames: 0,
+          streamSid: null
+        };
+
+        s.wsConnected = true;
+        s.streamSid = streamSid || s.streamSid;
+        mediaSessions.set(callSid, s);
+
+        console.log(`[${callSid}] Media Stream started (streamSid=${streamSid || 'n/a'})`);
+      }
+      return;
+    }
+
+    if (event === 'media') {
+      if (!callSid) return;
+
+      const s = mediaSessions.get(callSid) || {
+        callSid,
+        wsConnected: true,
+        startedAt: Date.now(),
+        lastMediaAt: null,
+        mediaFrames: 0,
+        streamSid: null
+      };
+
+      s.mediaFrames += 1;
+      s.lastMediaAt = Date.now();
+      mediaSessions.set(callSid, s);
+
+      if (s.mediaFrames % 100 === 0) {
+        console.log(`[${callSid}] Received ${s.mediaFrames} audio frames`);
+      }
+      return;
+    }
+
+    if (event === 'stop') {
+      if (callSid) console.log(`[${callSid}] Media Stream stopped`);
+      return;
+    }
+  });
+
+  ws.on('close', () => {
+    if (callSid && mediaSessions.has(callSid)) {
+      const s = mediaSessions.get(callSid);
+      s.wsConnected = false;
+      mediaSessions.set(callSid, s);
+    }
+  });
+});
+
+server.listen(port, '0.0.0.0', () => {
+  console.log(`Server running at http://127.0.0.1:${port}`);
+  console.log(`PUBLIC_BASE_URL = ${PUBLIC_BASE_URL}`);
+  console.log(`PUBLIC_WSS_URL  = ${PUBLIC_WSS_URL || '(not set)'}`);
 });
 
 // Get AI follow-up question (keeping this for web interface)
