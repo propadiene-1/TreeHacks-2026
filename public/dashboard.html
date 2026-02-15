@@ -3,17 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Scheduler</title>
+    <title>Dashboard · med sec</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 900px; margin: 0 auto; }
         input, select, button { display: block; margin: 10px 0; padding: 10px; width: 300px; }
-        button { background: #667eea; color: white; border: none; cursor: pointer; }
+        button { background: #667eea; color: white; border: none; cursor: pointer; border-radius: 8px; }
         #status { margin-top: 20px; padding: 10px; border-radius: 5px; }
         .success { background: #d4edda; color: #155724; }
         .error { background: #f8d7da; color: #721c24; }
         table { border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background: #667eea; color: white; }
+        .chart-section { margin-top: 40px; padding: 20px; background: #f8fcfd; border-radius: 12px; border: 1px solid #e0e8ec; }
+        .chart-section h2 { margin: 0 0 16px 0; font-size: 1.25rem; color: #333; }
+        .chart-wrap { position: relative; height: 280px; }
     </style>
 </head>
 <body>
@@ -34,6 +38,13 @@
     
     <div id="status"></div>
     <div id="scheduledCallsList"></div>
+
+    <section class="chart-section" aria-label="Pain over time">
+        <h2>Pain over time</h2>
+        <div class="chart-wrap">
+            <canvas id="painChart"></canvas>
+        </div>
+    </section>
 
     <script>
         console.log('Script loaded!');
@@ -129,6 +140,113 @@
         
         // Auto-load on page load
         loadScheduledCalls();
+
+        /**
+         * Create a line graph: reported pain, expected pain (from mood & physical), and actual pain (corrected for perception bias + baseline).
+         * Actual pain is fetched from POST /api/actual-pain (algorithm in pain-correction.js).
+         * @param {string} canvasId - Id of the <canvas> element.
+         * @param {Array<{date: string, mood: number, physicalCondition: number, painRating: number}>} timeseries - 0–10 scales.
+         * @param {Object} [options] - Optional { baseline } for fixed baseline pain.
+         * @returns {Promise<Chart>} Chart.js instance.
+         */
+        async function createPainLineGraph(canvasId, timeseries, options = {}) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return null;
+
+            const labels = timeseries.map(d => d.date);
+            const reportedPain = timeseries.map(d => d.painRating);
+
+            // Expected pain from mood & physical only (no baseline): 10 - (mood + physical)/2
+            function expectedFromMoodAndPhysical(mood, physicalCondition) {
+                const raw = 10 - (mood + physicalCondition) / 2;
+                return Math.max(0, Math.min(10, raw));
+            }
+            const expectedPain = timeseries.map(d => expectedFromMoodAndPhysical(d.mood, d.physicalCondition));
+
+            // Actual pain: perception-bias correction + baseline (from server algorithm)
+            let actualPain = [];
+            try {
+                const res = await fetch('/api/actual-pain', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ timeseries, options })
+                });
+                const json = await res.json();
+                if (json.data && json.data.length) {
+                    actualPain = json.data.map(r => r.actualPain);
+                }
+            } catch (e) {
+                console.warn('Actual pain API failed, using corrected only in UI', e);
+                actualPain = timeseries.map(() => null);
+            }
+            const hasActual = actualPain.length === labels.length && actualPain.some(v => v != null);
+
+            if (window._painChartInstance) {
+                window._painChartInstance.destroy();
+            }
+
+            const datasets = [
+                {
+                    label: 'Reported pain',
+                    data: reportedPain,
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    fill: true,
+                    tension: 0.3
+                },
+                {
+                    label: 'Expected pain (from mood & physical)',
+                    data: expectedPain,
+                    borderColor: '#82c0d8',
+                    backgroundColor: 'rgba(130, 192, 216, 0.05)',
+                    borderDash: [5, 5],
+                    fill: false,
+                    tension: 0.3
+                }
+            ];
+            if (hasActual) {
+                datasets.push({
+                    label: 'Actual pain (corrected + baseline)',
+                    data: actualPain,
+                    borderColor: '#2477a6',
+                    backgroundColor: 'rgba(36, 119, 166, 0.1)',
+                    fill: false,
+                    tension: 0.3
+                });
+            }
+
+            window._painChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 10,
+                            title: { display: true, text: 'Pain / score (0–10)' }
+                        },
+                        x: { title: { display: true, text: 'Date' } }
+                    },
+                    plugins: { legend: { position: 'top' } }
+                }
+            });
+
+            return window._painChartInstance;
+        }
+
+        // Demo: sample timeseries; chart uses /api/actual-pain for actual pain line
+        const sampleTimeseries = [
+            { date: '02-08', mood: 5, physicalCondition: 4, painRating: 5 },
+            { date: '02-09', mood: 4, physicalCondition: 5, painRating: 5 },
+            { date: '02-10', mood: 6, physicalCondition: 5, painRating: 4 },
+            { date: '02-11', mood: 5, physicalCondition: 4, painRating: 5 },
+            { date: '02-12', mood: 7, physicalCondition: 6, painRating: 3 },
+            { date: '02-13', mood: 6, physicalCondition: 6, painRating: 4 },
+            { date: '02-14', mood: 6, physicalCondition: 5, painRating: 4 }
+        ];
+        createPainLineGraph('painChart', sampleTimeseries);
     </script>
 </body>
 </html>
