@@ -1032,6 +1032,96 @@ wss.on('connection', (ws, req) => {
   });
 });
 
+// Semantic search on health data
+app.post('/api/search-health', async (req, res) => {
+    try {
+        const { query, phoneNumber, limit = 5 } = req.body;
+        
+        if (!query) {
+            return res.status(400).json({ error: 'Query required' });
+        }
+        
+        if (!transcriptCollection) {
+            return res.status(503).json({ error: 'Database not available' });
+        }
+        
+        console.log(`Semantic search: "${query}" for ${phoneNumber || 'all users'}`);
+        
+        // Semantic search on ChromaDB
+        const searchResults = await transcriptCollection.query({
+            queryTexts: [query],
+            nResults: Math.min(limit, 10),
+            where: phoneNumber ? { phoneNumber } : undefined,
+            include: ['documents', 'metadatas', 'distances']
+        });
+        
+        const docs = searchResults?.documents?.[0] || [];
+        const metas = searchResults?.metadatas?.[0] || [];
+        const distances = searchResults?.distances?.[0] || [];
+        
+        // Format results
+        const results = docs.map((doc, i) => ({
+            document: doc,
+            metadata: metas[i],
+            relevanceScore: 1 - (distances[i] || 1), // Convert distance to similarity
+            distance: distances[i]
+        })).filter(r => r.relevanceScore > 0.3); // Only show relevant results
+        
+        console.log(`Found ${results.length} relevant results`);
+        
+        res.json({
+            query,
+            results,
+            total: results.length
+        });
+        
+    } catch (error) {
+        console.error('Semantic search error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get demo transcripts for dashboard
+app.get('/api/demo-data', async (req, res) => {
+    try {
+        // Try to get demo collection
+        let demoCollection;
+        try {
+            demoCollection = await chroma.getCollection({ name: 'demo_transcripts' });
+        } catch (e) {
+            return res.json({ calls: [], message: 'Demo collection not found' });
+        }
+        
+        const demoData = await demoCollection.get({
+            limit: 100,
+            include: ['documents', 'metadatas']
+        });
+        
+        const calls = (demoData?.ids || []).map((id, i) => {
+            const meta = demoData.metadatas[i] || {};
+            const doc = demoData.documents[i];
+            
+            return {
+                id,
+                callSid: meta.callSid || id,
+                phoneNumber: meta.phoneNumber || 'Demo patient',
+                created_at: meta.created_at,
+                pain_rating: meta.pain_rating,
+                daily_mood: meta.daily_mood,
+                body_parts: meta.body_parts,
+                pain_phrases: meta.pain_phrases,
+                transcript: doc
+            };
+        }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        
+        res.json({ calls });
+        
+    } catch (error) {
+        console.error('Demo data error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 server.listen(port, '0.0.0.0', () => {
   console.log(`Server running at http://127.0.0.1:${port}`);
   console.log(`PUBLIC_BASE_URL = ${PUBLIC_BASE_URL}`);
