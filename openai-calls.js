@@ -8,36 +8,38 @@ const openai = new OpenAI({
 });
 
 /**
- * Generate follow-up questions based on user's medical query
- * @param {string} userQuery - The initial question or transcript from user
- * @returns {Promise<string>} - AI-generated follow-up question
+ * Generate follow-up question with symptom context
  */
-async function generateFollowUpQuestion(userQuery) {
+async function generateFollowUpQuestion(transcript, symptomContext = "") {
     try {
         const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-                {
-                    role: "user",
-                    content: `A medical patient has stated the following: ${userQuery}. Generate an information-seeking follow-up question without speculating on the patient's condition, with the goal of reporting to a doctor.`
-                }
-            ],
-            max_tokens: 100,
-            temperature: 0.7
+            model: 'gpt-4o',
+            messages: [{
+                role: 'system',
+                content: `You are a compassionate healthcare assistant.
+
+${symptomContext}
+
+- Prioritize OVERDUE symptoms
+- Reference previous symptom history
+- Ask about progression (better/worse/same)
+- Keep responses brief (1-2 sentences)
+- Be empathetic and natural`
+            }, {
+                role: 'user',
+                content: transcript
+            }],
+            temperature: 0.7,
+            max_tokens: 150
         });
 
         return response.choices[0].message.content.trim();
     } catch (error) {
-        console.error('OpenAI API Error:', error);
-        throw new Error('Failed to generate follow-up question');
+        console.error('OpenAI error:', error);
+        throw error;
     }
 }
 
-/**
- * Extract db information
- * @param {list} transcript - Full conversation transcript
- * @param {string} phoneNumber - Patient's phone number
- */
 
 async function extractDBColumns(transcript, phoneNumber) {
     try {
@@ -152,7 +154,12 @@ async function extractDBColumns(transcript, phoneNumber) {
  */
 async function autoScheduleFromTranscript(transcript, phoneNumber, scheduleFunction) {
     try {
-        transcript = transcript.join(" ")
+        try {
+            transcript = transcript.join(" ")
+        }
+        catch (error) {
+            transcript = transcript
+        }
         console.log('Auto-scheduling for:', phoneNumber);
         
         // Call OpenAI to determine optimal schedule
