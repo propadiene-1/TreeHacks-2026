@@ -52,6 +52,7 @@ const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
 const client = twilio(accountSid, authToken);
 const { generateFollowUpQuestion, autoScheduleFromTranscript, extractKeywordsFromTranscript } = require('./openai-calls');
+const { actualPainFromTimeseries } = require('./pain-correction');
 const scheduledCalls = [];
 
 const conversations = new Map();
@@ -364,6 +365,22 @@ app.get('/scheduled-calls', (req, res) => {
         time,
     }));
     res.json({ calls });
+});
+
+// Pain correction: compute actual pain from timeseries (mood, physical condition, reported pain, baseline)
+// POST body: { timeseries: [{ date?, mood, physicalCondition, painRating }], options?: { baseline?, kMood?, kPhysical?, alphaCorrected? } }
+app.post('/api/actual-pain', (req, res) => {
+    try {
+        const { timeseries, options } = req.body || {};
+        if (!Array.isArray(timeseries) || timeseries.length === 0) {
+            return res.status(400).json({ error: 'timeseries array required' });
+        }
+        const result = actualPainFromTimeseries(timeseries, options || {});
+        res.json({ data: result });
+    } catch (err) {
+        console.error('Actual pain API error:', err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 async function makeTwilioCall(phoneNumber) {
