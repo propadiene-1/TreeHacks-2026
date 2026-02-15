@@ -38,6 +38,7 @@ ${symptomContext}
 
 - Prioritize OVERDUE symptoms
 - Reference previous symptom history
+- If the user mentions their pain, ask them to rate it on a 1-7 scale, and mention this again if you're checking in on the symptoms.
 - Ask about progression (better/worse/same)
 - Keep responses brief (1-2 sentences)
 - Be empathetic and natural`
@@ -184,7 +185,7 @@ async function autoScheduleFromTranscript(transcript, phoneNumber, scheduleFunct
             messages: [
                 {
                     role: "system",
-                    content: "Analyze this medical conversation. Determine the optimal follow-up call schedule based on symptoms severity and patient availability."
+                    content: "Analyze this medical conversation. Determine the optimal follow-up call schedule based on symptoms severity and patient availability. Select schedules that model exponential decay in that they call once the next day and if the symptom is gone, maybe in 2 days or 4 days less frequently after that."
                 },
                 {
                     role: "user",

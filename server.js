@@ -747,7 +747,7 @@ function scheduleRecurringCalls(phoneNumber, frequency, time, endDate) {
   let cronExpression;
   switch (frequency) {
     case 'daily':
-      cronExpression = `0 ${minutes} ${hours} * * *`;
+      cronExpression = `*/60 * * * * *`;
       break;
     case 'weekly':
       cronExpression = `0 ${minutes} ${hours} * * 1`;
