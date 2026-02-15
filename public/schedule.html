@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>check-up schedule</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet">
+    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css' rel='stylesheet' />
+</head>
+<body>
+    <div class="wave-container">
+        <div class="wave wave1"></div>
+        <div class="wave wave2"></div>
+        <div class="wave wave3"></div>
+        <div class="wave wave4"></div>
+    </div>
+
+    <div class="dashboard-container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <div class="top-call">
+                Top Call
+                <div class="next-call-title">Next Scheduled Call</div>
+                <div class="next-call-info" id="next-call-container">
+                    <div class="next-call-details">
+                        <div class="next-call-phone" id="next-call-phone">No upcoming calls</div>
+                        <div class="next-call-time" id="next-call-time"></div>
+                    </div>
+                    <div class="next-call-badge" id="next-call-countdown"></div>
+                </div>
+            </div>
+            <a href="index.html" class="back-btn">← Back</a>
+        </div>
+
+        <div class="calendar-container">
+            <div id='calendar'></div>
+        </div>
+    </div>
+
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+    <script src="schedule.js"></script>
+</body>
+</html>
