@@ -2,10 +2,12 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    text-transform: lowercase;
 }
 
+
 body {
-    font-family: 'Nunito', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Varela Round', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     height: 100vh;
     overflow: hidden;
     position: relative;
@@ -128,6 +130,7 @@ body {
 }
 
 h1 {
+    font-family: 'Sour Gummy', sans-serif;
     font-size: 3.5rem;
     font-weight: 700;
     color: #2477a6;
@@ -144,7 +147,7 @@ input[type="tel"] {
     width: 100%;
     padding: 18px 24px;
     font-size: 1rem;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Varela Round', sans-serif;
     border: 2px solid #b8dce8;
     border-radius: 12px;
     outline: none;
@@ -175,7 +178,7 @@ input[type="tel"]:focus {
     padding: 18px 32px;
     font-size: 1.05rem;
     font-weight: 600;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Varela Round', sans-serif;
     border: none;
     border-radius: 12px;
     cursor: pointer;
@@ -240,3 +243,4 @@ input[type="tel"]:focus {
         font-size: 1rem;
     }
 }
+
