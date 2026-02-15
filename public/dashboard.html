@@ -1,526 +1,859 @@
+<!-- dashboard.html (FULL FILE WITH ALL CHANGES) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard · med sec</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&family=Coiny&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Sour+Gummy:wght@700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard · med sec</title>
 
-        body { 
-            font-family: 'Quicksand', sans-serif;
-            background: linear-gradient(135deg, #5ca4c4 0%, #3686b0 100%);
-            min-height: 100vh;
-            padding: 20px;
-            position: relative;
-            overflow-x: hidden;
-        }
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-        /* Wave animations from index.html */
-        .wave-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            z-index: 0;
-            pointer-events: none;
-        }
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&family=Coiny&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Sour+Gummy:wght@700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet" />
 
-        .wave {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 200%;
-            height: 100%;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.1) 100%);
-            border-radius: 50% 50% 0 0;
-            animation: wave 15s ease-in-out infinite;
-        }
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
-        .wave1 { animation-delay: 0s; opacity: 0.3; }
-        .wave2 { animation-delay: 2s; opacity: 0.2; }
-        .wave3 { animation-delay: 4s; opacity: 0.15; }
-        .wave4 { animation-delay: 6s; opacity: 0.1; }
+    body {
+      font-family: 'Quicksand', sans-serif;
+      background: linear-gradient(135deg, #5ca4c4 0%, #3686b0 100%);
+      min-height: 100vh;
+      padding: 20px;
+      position: relative;
+      overflow-x: hidden;
+    }
 
-        @keyframes wave {
-            0%, 100% { transform: translateX(0) translateY(0); }
-            50% { transform: translateX(-25%) translateY(-10%); }
-        }
+    .wave-container {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      z-index: 0;
+      pointer-events: none;
+    }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            position: relative;
-            z-index: 1;
-        }
+    .wave {
+      position: absolute;
+      bottom: 0; left: 0;
+      width: 200%; height: 100%;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.1) 100%);
+      border-radius: 50% 50% 0 0;
+      animation: wave 15s ease-in-out infinite;
+    }
 
-        h1 {
-            font-family: 'Sour Gummy', cursive;
-            font-size: 3rem;
-            text-align: center;
-            margin-bottom: 30px;
-            color: white;
-            text-shadow: 2px 2px 8px rgba(0,0,0,0.2);
-        }
+    .wave1 { animation-delay: 0s; opacity: 0.3; }
+    .wave2 { animation-delay: 2s; opacity: 0.2; }
+    .wave3 { animation-delay: 4s; opacity: 0.15; }
+    .wave4 { animation-delay: 6s; opacity: 0.1; }
 
-        .med {
-            color: #FFD700;
-        }
+    @keyframes wave {
+      0%, 100% { transform: translateX(0) translateY(0); }
+      50% { transform: translateX(-25%) translateY(-10%); }
+    }
 
-        .sec {
-            color: #87CEEB;
-        }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
 
-        .content-wrapper {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        }
+    h1 {
+      font-family: 'Sour Gummy', cursive;
+      font-size: 3rem;
+      text-align: center;
+      margin-bottom: 30px;
+      color: white;
+      text-shadow: 2px 2px 8px rgba(0,0,0,0.2);
+    }
 
-        .scheduler-section {
-            background: white;
-            padding: 25px;
-            border-radius: 15px;
-            margin-bottom: 25px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
+    .med { color: #FFD700; }
+    .sec { color: #87CEEB; }
 
-        .scheduler-section h2 {
-            color: #3686b0;
-            font-size: 1.5rem;
-            margin-bottom: 20px;
-            font-weight: 600;
-        }
+    .content-wrapper {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
 
-        input, select {
-            display: block;
-            margin: 15px 0;
-            padding: 12px 15px;
-            width: 100%;
-            max-width: 400px;
-            border: 2px solid #e0e8ec;
-            border-radius: 10px;
-            font-family: 'Quicksand', sans-serif;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
+    .chart-section {
+      margin-top: 20px;
+      padding: 25px;
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
 
-        input:focus, select:focus {
-            outline: none;
-            border-color: #3686b0;
-            box-shadow: 0 0 0 3px rgba(54, 134, 176, 0.1);
-        }
+    .chart-section h2 {
+      margin: 0 0 20px 0;
+      font-size: 1.5rem;
+      color: #3686b0;
+      font-weight: 600;
+    }
 
-        button {
-            background: linear-gradient(135deg, #5ca4c4 0%, #3686b0 100%);
-            color: white;
-            border: none;
-            cursor: pointer;
-            border-radius: 10px;
-            padding: 12px 25px;
-            font-family: 'Quicksand', sans-serif;
-            font-size: 1rem;
-            font-weight: 600;
-            margin: 10px 10px 10px 0;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(92, 164, 196, 0.4);
-        }
+    .chart-wrap { position: relative; height: 330px; margin-top: 10px; }
 
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(92, 164, 196, 0.6);
-        }
+    .readings-table-section { margin-top: 22px; }
+    .readings-table-section h3 {
+      margin: 0 0 15px 0;
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: #3686b0;
+    }
 
-        button:active {
-            transform: translateY(0);
-        }
+    .pain-readings-table-wrap {
+      overflow: hidden;
+      border-radius: 12px;
+      border: 1px solid #e0e8ec;
+      box-shadow: 0 2px 8px rgba(54, 134, 176, 0.1);
+      background: #fff;
+    }
 
-        #status {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 10px;
-            font-weight: 500;
-        }
+    .pain-readings-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95rem;
+    }
 
-        .success {
-            background: #d4edda;
-            color: #155724;
-            border: 2px solid #c3e6cb;
-        }
+    .pain-readings-table thead th {
+      background: linear-gradient(135deg, #5ca4c4 0%, #3686b0 100%);
+      color: #fff;
+      font-weight: 600;
+      text-align: left;
+      padding: 14px 18px;
+      white-space: nowrap;
+    }
 
-        .error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 2px solid #f5c6cb;
-        }
+    .pain-readings-table tbody tr {
+      border-bottom: 1px solid #eef4f7;
+      transition: background 0.15s ease;
+    }
 
-        table {
-            border-collapse: collapse;
-            margin-top: 20px;
-            width: 100%;
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
+    .pain-readings-table tbody tr:hover { background: #f8fcfd; }
+    .pain-readings-table tbody tr:last-child { border-bottom: none; }
+    .pain-readings-table tbody tr:nth-child(even) { background: #fafcfd; }
+    .pain-readings-table tbody tr:nth-child(even):hover { background: #f0f8fb; }
 
-        th, td {
-            border: 1px solid #e0e8ec;
-            padding: 12px 15px;
-            text-align: left;
-        }
+    .pain-readings-table td { padding: 14px 18px; color: #333; }
+    .pain-readings-table td:first-child { font-weight: 500; color: #3686b0; }
+    .pain-readings-table td.num { text-align: right; font-variant-numeric: tabular-nums; color: #444; }
 
-        th {
-            background: linear-gradient(135deg, #5ca4c4 0%, #3686b0 100%);
-            color: white;
-            font-weight: 600;
-        }
+    .pain-readings-table .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
 
-        tr:hover {
-            background: #f8fcfd;
-        }
+    .pain-readings-table .improved .badge { background: #d4edda; color: #155724; }
+    .pain-readings-table .worse .badge { background: #f8d7da; color: #721c24; }
+    .pain-readings-table .same .badge { background: #e9ecef; color: #495057; }
 
-        .chart-section {
-            margin-top: 30px;
-            padding: 25px;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
+    .back-link {
+      display: inline-block;
+      margin-bottom: 18px;
+      color: white;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+    }
+    .back-link:hover { transform: translateX(-5px); }
 
-        .chart-section h2 {
-            margin: 0 0 20px 0;
-            font-size: 1.5rem;
-            color: #3686b0;
-            font-weight: 600;
-        }
+    .call-logs-section {
+      margin-top: 26px;
+      padding: 25px;
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
 
-        .chart-wrap {
-            position: relative;
-            height: 350px;
-            margin-top: 20px;
-        }
+    .call-logs-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
 
-        .readings-table-section {
-            margin-top: 30px;
-        }
+    .call-logs-header h2 {
+      margin: 0;
+      font-size: 1.5rem;
+      color: #3686b0;
+      font-weight: 600;
+    }
 
-        .readings-table-section h3 {
-            margin: 0 0 15px 0;
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: #3686b0;
-        }
+    .small-muted {
+      color: #6b7c87;
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
 
-        .pain-readings-table-wrap {
-            overflow: hidden;
-            border-radius: 12px;
-            border: 1px solid #e0e8ec;
-            box-shadow: 0 2px 8px rgba(54, 134, 176, 0.1);
-            background: #fff;
-        }
+    .call-log-list { display: flex; flex-direction: column; gap: 10px; }
 
-        .pain-readings-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.95rem;
-        }
+    .call-log-item {
+      border: 1px solid #e0e8ec;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #ffffff;
+      box-shadow: 0 2px 8px rgba(54, 134, 176, 0.06);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
 
-        .pain-readings-table thead th {
-            background: linear-gradient(135deg, #5ca4c4 0%, #3686b0 100%);
-            color: #fff;
-            font-weight: 600;
-            text-align: left;
-            padding: 14px 18px;
-            white-space: nowrap;
-        }
+    .call-log-item:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(54, 134, 176, 0.10);
+    }
 
-        .pain-readings-table thead th:first-child { padding-left: 20px; }
-        .pain-readings-table thead th:last-child { padding-right: 20px; }
+    .call-log-summary {
+      width: 100%;
+      text-align: left;
+      padding: 14px 16px;
+      background: #f8fcfd;
+      border: none;
+      cursor: pointer;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      font-family: 'Quicksand', sans-serif;
+    }
 
-        .pain-readings-table tbody tr {
-            border-bottom: 1px solid #eef4f7;
-            transition: background 0.15s ease;
-        }
+    .call-log-summary:focus { outline: 3px solid rgba(54,134,176,0.18); }
 
-        .pain-readings-table tbody tr:hover { background: #f8fcfd; }
-        .pain-readings-table tbody tr:last-child { border-bottom: none; }
-        .pain-readings-table tbody tr:nth-child(even) { background: #fafcfd; }
-        .pain-readings-table tbody tr:nth-child(even):hover { background: #f0f8fb; }
+    .call-log-title {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
 
-        .pain-readings-table td {
-            padding: 14px 18px;
-            color: #333;
-        }
+    .call-log-title .primary {
+      color: #2477a6;
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
 
-        .pain-readings-table td:first-child { padding-left: 20px; font-weight: 500; color: #3686b0; }
-        .pain-readings-table td:last-child { padding-right: 20px; }
-        .pain-readings-table td.num {
-            text-align: right;
-            font-variant-numeric: tabular-nums;
-            color: #444;
-        }
+    .call-log-title .secondary {
+      color: #5a6d78;
+      font-size: 0.92rem;
+      font-weight: 600;
+    }
 
-        .pain-readings-table .badge {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
+    .chevron {
+      color: #3686b0;
+      font-weight: 900;
+      font-size: 1.1rem;
+      transition: transform 0.15s ease;
+    }
 
-        .pain-readings-table .improved .badge {
-            background: #d4edda;
-            color: #155724;
-        }
+    .call-log-item.open .chevron { transform: rotate(90deg); }
 
-        .pain-readings-table .worse .badge {
-            background: #f8d7da;
-            color: #721c24;
-        }
+    .call-log-details {
+      display: none;
+      padding: 16px;
+      background: #ffffff;
+      border-top: 1px solid #eef4f7;
+    }
 
-        .pain-readings-table .same .badge {
-            background: #e9ecef;
-            color: #495057;
-        }
+    .call-log-item.open .call-log-details { display: block; }
 
-        /* Back button */
-        .back-link {
-            display: inline-block;
-            margin-bottom: 20px;
-            color: white;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
+    .details-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
 
-        .back-link:hover {
-            transform: translateX(-5px);
-        }
-    </style>
+    @media (max-width: 900px) {
+      .details-grid { grid-template-columns: 1fr; }
+    }
+
+    .details-card {
+      border: 1px solid #e0e8ec;
+      border-radius: 12px;
+      padding: 14px;
+      background: #fbfdfe;
+    }
+
+    .details-card h3 {
+      margin: 0 0 10px 0;
+      color: #3686b0;
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 170px 1fr;
+      gap: 8px 12px;
+      align-items: start;
+      font-size: 0.95rem;
+    }
+
+    .kv .k { color: #4e606b; font-weight: 700; }
+    .kv .v { color: #1f2a30; font-weight: 600; white-space: pre-wrap; }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.92rem;
+      color: #21313a;
+      white-space: pre-wrap;
+      background: #f8fcfd;
+      border: 1px solid #e0e8ec;
+      border-radius: 12px;
+      padding: 12px;
+      max-height: 240px;
+      overflow: auto;
+    }
+
+    .empty-state {
+      padding: 18px;
+      border-radius: 12px;
+      background: #f8fcfd;
+      border: 1px dashed #cfe3ec;
+      color: #51646f;
+      font-weight: 600;
+    }
+
+    /* Old visual layout blocks */
+    .old-visual-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      margin-top: 12px;
+    }
+
+    .old-card {
+      border: 1px solid #e0e8ec;
+      border-radius: 12px;
+      padding: 14px;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(54, 134, 176, 0.06);
+    }
+
+    .old-card h4 {
+      margin: 0 0 10px 0;
+      color: #111;
+      font-size: 1.05rem;
+      font-weight: 800;
+      font-family: 'Quicksand', sans-serif;
+    }
+
+    .chart-wrap-small { position: relative; height: 220px; }
+
+    .barcode-wrap {
+      border-radius: 12px;
+      border: 1px solid #e0e8ec;
+      background: #f3f5f6;
+      height: 88px;
+      overflow: hidden;
+    }
+
+    canvas.barcode {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .indicator-card {
+      width: 340px;
+      max-width: 100%;
+    }
+
+    @media (max-width: 900px) {
+      .indicator-card { width: 100%; }
+    }
+
+    .indicator-list {
+      font-size: 0.98rem;
+      white-space: pre-wrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      color: #111;
+      line-height: 1.35;
+    }
+  </style>
 </head>
+
 <body>
-    <div class="wave-container">
-        <div class="wave wave1"></div>
-        <div class="wave wave2"></div>
-        <div class="wave wave3"></div>
-        <div class="wave wave4"></div>
-    </div>
+  <div class="wave-container">
+    <div class="wave wave1"></div>
+    <div class="wave wave2"></div>
+    <div class="wave wave3"></div>
+    <div class="wave wave4"></div>
+  </div>
 
-    <div class="container">
-        <a href="index.html" class="back-link">← Back to Home</a>
-    </div>
+  <div class="container">
+    <a href="index.html" class="back-link">← Back to Home</a>
 
-    <section class="chart-section" aria-label="Pain over time">
+    <h1><span class="med">med</span> <span class="sec">sec</span> dashboard</h1>
+
+    <div class="content-wrapper">
+
+      <section class="chart-section" aria-label="Pain over time">
         <h2>Pain over time</h2>
         <div class="chart-wrap">
-            <canvas id="painChart"></canvas>
+          <canvas id="painChart"></canvas>
         </div>
         <div class="readings-table-section">
-            <h3>Readings per day</h3>
-            <div id="painReadingsTable"></div>
+          <h3>Readings per day</h3>
+          <div id="painReadingsTable"></div>
         </div>
-    </section>
+      </section>
 
-    <script>
-        console.log('Script loaded!');
+      <section class="call-logs-section" aria-label="Call logs">
+        <div class="call-logs-header">
+          <h2>Call logs</h2>
+          <div class="small-muted" id="callLogMeta">Loading…</div>
+        </div>
 
-        const timeInput = document.getElementById('time');
-        const statusDiv = document.getElementById('status');
-        
-        /**
-         * Create a line graph: reported pain, expected pain (from mood & physical), and actual pain (corrected for perception bias + baseline).
-         * Actual pain is fetched from POST /api/actual-pain (algorithm in pain-correction.js).
-         * @param {string} canvasId - Id of the <canvas> element.
-         * @param {Array<{date: string, mood: number, physicalCondition: number, painRating: number}>} timeseries - 0–10 scales.
-         * @param {Object} [options] - Optional { baseline } for fixed baseline pain.
-         * @returns {Promise<Chart>} Chart.js instance.
-         */
-        async function createPainLineGraph(canvasId, timeseries, options = {}) {
-            const ctx = document.getElementById(canvasId);
-            if (!ctx) return null;
+        <div id="callLogList" class="call-log-list"></div>
+      </section>
 
-            const labels = timeseries.map(d => d.date);
-            const reportedPain = timeseries.map(d => d.painRating);
+    </div>
+  </div>
 
-            // Expected pain from mood & physical only (no baseline): 10 - (mood + physical)/2
-            function expectedFromMoodAndPhysical(mood, physicalCondition) {
-                const raw = 10 - (mood + physicalCondition) / 2;
-                return Math.max(0, Math.min(10, raw));
+  <script>
+    let _painChartInstance = null;
+    const _rmsCharts = new Map(); // callSid -> Chart
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text == null ? '' : String(text);
+      return div.innerHTML;
+    }
+
+    function safeStr(v) {
+      if (v == null) return '—';
+      if (typeof v === 'string' && !v.trim()) return '—';
+      return String(v);
+    }
+
+    function fmtDate(iso) {
+      try { return new Date(iso).toLocaleString(); }
+      catch { return iso; }
+    }
+
+    async function createPainLineGraph(canvasId, timeseries, options = {}) {
+      const ctx = document.getElementById(canvasId);
+      if (!ctx) return null;
+
+      const labels = timeseries.map(d => d.date);
+      const reportedPain = timeseries.map(d => d.painRating);
+
+      function expectedFromMoodAndPhysical(mood, physicalCondition) {
+        const raw = 10 - (mood + physicalCondition) / 2;
+        return Math.max(0, Math.min(10, raw));
+      }
+      const expectedPain = timeseries.map(d => expectedFromMoodAndPhysical(d.mood, d.physicalCondition));
+
+      let actualPainData = [];
+      let actualPain = [];
+      try {
+        const res = await fetch('/api/actual-pain', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ timeseries, options })
+        });
+        const json = await res.json();
+        if (json.data && json.data.length) {
+          actualPainData = json.data;
+          actualPain = actualPainData.map(r => r.actualPain);
+        }
+      } catch {
+        actualPain = timeseries.map(() => null);
+      }
+
+      const hasActual = actualPain.length === labels.length && actualPain.some(v => v != null);
+
+      if (_painChartInstance) _painChartInstance.destroy();
+
+      const datasets = [
+        {
+          label: 'Reported pain',
+          data: reportedPain,
+          borderColor: '#5ca4c4',
+          backgroundColor: 'rgba(92, 164, 196, 0.1)',
+          fill: true,
+          tension: 0.3,
+          borderWidth: 2
+        },
+        {
+          label: 'Expected pain (from mood & physical)',
+          data: expectedPain,
+          borderColor: '#82c0d8',
+          backgroundColor: 'rgba(130, 192, 216, 0.05)',
+          borderDash: [5, 5],
+          fill: false,
+          tension: 0.3,
+          borderWidth: 2
+        }
+      ];
+
+      if (hasActual) {
+        datasets.push({
+          label: 'Actual pain (corrected + baseline)',
+          data: actualPain,
+          borderColor: '#2477a6',
+          backgroundColor: 'rgba(36, 119, 166, 0.1)',
+          fill: false,
+          tension: 0.3,
+          borderWidth: 2
+        });
+      }
+
+      _painChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { min: 0, max: 10, grid: { color: 'rgba(0, 0, 0, 0.05)' } },
+            x: { grid: { color: 'rgba(0, 0, 0, 0.05)' } }
+          },
+          plugins: { legend: { position: 'top' } }
+        }
+      });
+
+      if (actualPainData.length) renderPainReadingsTable(actualPainData);
+      return _painChartInstance;
+    }
+
+    function renderPainReadingsTable(data) {
+      const container = document.getElementById('painReadingsTable');
+      if (!container) return;
+
+      const thresh = 0.3;
+      let html = '<div class="pain-readings-table-wrap"><table class="pain-readings-table"><thead><tr><th>Date</th><th>Reported pain</th><th>Baseline pain</th><th>Actual pain</th><th>Pain improved</th></tr></thead><tbody>';
+
+      data.forEach(row => {
+        const baseline = row.baseline != null ? row.baseline.toFixed(1) : '—';
+        const actual = row.actualPain != null ? row.actualPain.toFixed(1) : '—';
+        const diff = row.baseline != null && row.actualPain != null ? row.baseline - row.actualPain : null;
+
+        let improved = '—';
+        let cls = '';
+        if (diff != null) {
+          if (diff > thresh) { improved = '<span class="badge">Yes (' + diff.toFixed(1) + ')</span>'; cls = 'improved'; }
+          else if (diff < -thresh) { improved = '<span class="badge">Worse (' + (-diff).toFixed(1) + ')</span>'; cls = 'worse'; }
+          else { improved = '<span class="badge">Same</span>'; cls = 'same'; }
+        }
+
+        html += `<tr>
+          <td>${escapeHtml(row.date || '—')}</td>
+          <td class="num">${row.reportedPain != null ? row.reportedPain.toFixed(1) : '—'}</td>
+          <td class="num">${baseline}</td>
+          <td class="num">${actual}</td>
+          <td class="${cls}">${improved}</td>
+        </tr>`;
+      });
+
+      html += '</tbody></table></div>';
+      container.innerHTML = html;
+    }
+
+    const sampleTimeseries = [
+      { date: '02-08', mood: 5, physicalCondition: 4, painRating: 5 },
+      { date: '02-09', mood: 4, physicalCondition: 5, painRating: 5 },
+      { date: '02-10', mood: 6, physicalCondition: 5, painRating: 4 },
+      { date: '02-11', mood: 5, physicalCondition: 4, painRating: 5 },
+      { date: '02-12', mood: 7, physicalCondition: 6, painRating: 3 },
+      { date: '02-13', mood: 6, physicalCondition: 6, painRating: 4 },
+      { date: '02-14', mood: 6, physicalCondition: 5, painRating: 4 }
+    ];
+    createPainLineGraph('painChart', sampleTimeseries);
+
+    async function loadCallLogs() {
+      const meta = document.getElementById('callLogMeta');
+      const list = document.getElementById('callLogList');
+      meta.textContent = 'Loading…';
+
+      try {
+        const res = await fetch('/api/call-logs?limit=50');
+        const json = await res.json();
+        const logs = json.logs || [];
+
+        meta.textContent = logs.length ? `${logs.length} saved call${logs.length === 1 ? '' : 's'}` : 'No calls yet';
+
+        if (!logs.length) {
+          list.innerHTML = '<div class="empty-state">No call logs yet. Make a call, then come back here.</div>';
+          return;
+        }
+
+        list.innerHTML = logs.map(l => {
+          const title = `${escapeHtml(l.phoneNumber || 'Unknown number')}`;
+          const subtitle = `${escapeHtml(fmtDate(l.created_at))} · ${escapeHtml(l.callSid || '')}`;
+          return `
+            <div class="call-log-item" data-callsid="${escapeHtml(l.callSid)}">
+              <button class="call-log-summary" type="button" aria-expanded="false">
+                <div class="call-log-title">
+                  <div class="primary">📞 ${title}</div>
+                  <div class="secondary">${subtitle}</div>
+                </div>
+                <div class="chevron">›</div>
+              </button>
+              <div class="call-log-details"></div>
+            </div>
+          `;
+        }).join('');
+
+        document.querySelectorAll('.call-log-item .call-log-summary').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const item = btn.closest('.call-log-item');
+            const callSid = item.getAttribute('data-callsid');
+            const expanded = btn.getAttribute('aria-expanded') === 'true';
+
+            if (expanded) {
+              btn.setAttribute('aria-expanded', 'false');
+              item.classList.remove('open');
+              return;
             }
-            const expectedPain = timeseries.map(d => expectedFromMoodAndPhysical(d.mood, d.physicalCondition));
 
-            // Actual pain: perception-bias correction + baseline (from server algorithm)
-            let actualPainData = [];
-            let actualPain = [];
+            btn.setAttribute('aria-expanded', 'true');
+            item.classList.add('open');
+
+            const details = item.querySelector('.call-log-details');
+            if (details.getAttribute('data-loaded') === 'true') return;
+
+            details.innerHTML = '<div class="empty-state">Loading details…</div>';
+
             try {
-                const res = await fetch('/api/actual-pain', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ timeseries, options })
-                });
-                const json = await res.json();
-                if (json.data && json.data.length) {
-                    actualPainData = json.data;
-                    actualPain = actualPainData.map(r => r.actualPain);
-                }
+              const dRes = await fetch(`/api/call-logs/${encodeURIComponent(callSid)}`);
+              const dJson = await dRes.json();
+              const log = dJson.log;
+
+              details.innerHTML = renderCallLogDetails(log);
+              details.setAttribute('data-loaded', 'true');
+
+              renderOldVisuals(callSid, log);
+
             } catch (e) {
-                console.warn('Actual pain API failed, using corrected only in UI', e);
-                actualPain = timeseries.map(() => null);
+              details.innerHTML = `<div class="empty-state">Failed to load call details: ${escapeHtml(e.message || String(e))}</div>`;
             }
-            const hasActual = actualPain.length === labels.length && actualPain.some(v => v != null);
+          });
+        });
 
-            if (window._painChartInstance) {
-                window._painChartInstance.destroy();
+      } catch (e) {
+        meta.textContent = 'Error';
+        list.innerHTML = `<div class="empty-state">Failed to load call logs: ${escapeHtml(e.message || String(e))}</div>`;
+      }
+    }
+
+    function renderCallLogDetails(log) {
+      const extracted = log?.extracted || {};
+      const abnormal = Array.isArray(log?.abnormalLog) ? log.abnormalLog : [];
+      const transcript = Array.isArray(log?.transcript) ? log.transcript : [];
+
+      const rmsId = `rmsDb_${escapeHtml(log.callSid)}`;
+      const barcodeId = `barcode_${escapeHtml(log.callSid)}`;
+
+      return `
+        <div class="details-grid">
+          <div class="details-card">
+            <h3>Extracted measurements</h3>
+            <div class="kv">
+              <div class="k">Pain rating</div>
+              <div class="v">${safeStr(extracted.pain_rating)}</div>
+
+              <div class="k">Daily mood</div>
+              <div class="v">${safeStr(extracted.daily_mood)}</div>
+
+              <div class="k">Notes</div>
+              <div class="v">${safeStr(extracted.free_text_notes)}</div>
+            </div>
+          </div>
+
+          <div class="details-card">
+            <h3>Observations</h3>
+            <div class="k" style="margin-bottom: 8px; color:#4e606b; font-weight:700;">Abnormal voice events</div>
+            <div class="mono">${abnormal.length ? escapeHtml(abnormal.map(a => `${a.t}: ${a.message}`).join('\n')) : '—'}</div>
+
+            <div style="height: 12px"></div>
+
+            <div class="k" style="margin-bottom: 8px; color:#4e606b; font-weight:700;">Transcript</div>
+            <div class="mono">${transcript.length ? escapeHtml(transcript.map(t => `${t.speaker}: ${t.message}`).join('\n')) : '—'}</div>
+          </div>
+        </div>
+
+        <div class="old-visual-grid">
+          <div class="old-card">
+            <h4>RMS dB over time</h4>
+            <div class="chart-wrap-small">
+              <canvas id="${rmsId}"></canvas>
+            </div>
+          </div>
+
+          <div class="old-card">
+            <h4>Voiced vs silence</h4>
+            <div class="barcode-wrap">
+              <canvas class="barcode" id="${barcodeId}"></canvas>
+            </div>
+          </div>
+
+          <div class="old-card indicator-card">
+            <h4>Rolling 60s indicators</h4>
+            <div class="indicator-list" id="ind_${escapeHtml(log.callSid)}">Loading…</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function destroyRmsChart(callSid) {
+      const prev = _rmsCharts.get(callSid);
+      if (!prev) return;
+      try { prev.destroy(); } catch {}
+      _rmsCharts.delete(callSid);
+    }
+
+    function renderOldVisuals(callSid, log) {
+      destroyRmsChart(callSid);
+
+      const rmsDbSeries = log?.biomarkers?.rmsDbSeries || [];
+      const voicedSeries = log?.biomarkers?.voicedSeries || [];
+      const rolling60 = log?.biomarkers?.rolling60Series || [];
+
+      // RMS chart
+      const rmsCanvas = document.getElementById(`rmsDb_${callSid}`);
+      if (rmsCanvas) {
+        if (!rmsDbSeries.length) {
+          rmsCanvas.parentElement.innerHTML = '<div class="empty-state">No RMS series captured.</div>';
+        } else {
+          const labels = rmsDbSeries.map(p => {
+            try { return new Date(p.t).toLocaleTimeString(); }
+            catch { return p.t; }
+          });
+          const data = rmsDbSeries.map(p => p.rmsDb);
+
+          const chart = new Chart(rmsCanvas, {
+            type: 'line',
+            data: {
+              labels,
+              datasets: [{
+                label: 'RMS dB',
+                data,
+                borderColor: '#111',
+                backgroundColor: 'rgba(0,0,0,0.06)',
+                fill: false,
+                tension: 0.25,
+                borderWidth: 2,
+                pointRadius: 0
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: {
+                x: { grid: { display: false } },
+                y: { grid: { color: 'rgba(0,0,0,0.06)' } }
+              }
             }
+          });
 
-            const datasets = [
-                {
-                    label: 'Reported pain',
-                    data: reportedPain,
-                    borderColor: '#5ca4c4',
-                    backgroundColor: 'rgba(92, 164, 196, 0.1)',
-                    fill: true,
-                    tension: 0.3,
-                    borderWidth: 2
-                },
-                {
-                    label: 'Expected pain (from mood & physical)',
-                    data: expectedPain,
-                    borderColor: '#82c0d8',
-                    backgroundColor: 'rgba(130, 192, 216, 0.05)',
-                    borderDash: [5, 5],
-                    fill: false,
-                    tension: 0.3,
-                    borderWidth: 2
-                }
-            ];
-            if (hasActual) {
-                datasets.push({
-                    label: 'Actual pain (corrected + baseline)',
-                    data: actualPain,
-                    borderColor: '#2477a6',
-                    backgroundColor: 'rgba(36, 119, 166, 0.1)',
-                    fill: false,
-                    tension: 0.3,
-                    borderWidth: 2
-                });
-            }
-
-            window._painChartInstance = new Chart(ctx, {
-                type: 'line',
-                data: { labels, datasets },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            min: 0,
-                            max: 10,
-                            title: { display: true, text: 'Pain / score (0–10)' },
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.05)'
-                            }
-                        },
-                        x: { 
-                            title: { display: true, text: 'Date' },
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.05)'
-                            }
-                        }
-                    },
-                    plugins: { 
-                        legend: { 
-                            position: 'top',
-                            labels: {
-                                font: {
-                                    family: 'Quicksand'
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-
-            // Table: readings per day, baseline, pain improved
-            if (actualPainData.length) {
-                renderPainReadingsTable(actualPainData);
-            }
-
-            return window._painChartInstance;
+          _rmsCharts.set(callSid, chart);
         }
+      }
 
-        /**
-         * Render table: Date | Reported | Baseline | Actual | Pain improved
-         * @param {Array<{date?: string, reportedPain: number, baseline: number, actualPain: number}>} data - from /api/actual-pain
-         */
-        function renderPainReadingsTable(data) {
-            const container = document.getElementById('painReadingsTable');
-            if (!container) return;
-            const thresh = 0.3; // same if |baseline - actual| <= thresh
-            let html = '<div class="pain-readings-table-wrap"><table class="pain-readings-table"><thead><tr><th>Date</th><th>Reported pain</th><th>Baseline pain</th><th>Actual pain</th><th>Pain improved</th></tr></thead><tbody>';
-            data.forEach(row => {
-                const baseline = row.baseline != null ? row.baseline.toFixed(1) : '—';
-                const actual = row.actualPain != null ? row.actualPain.toFixed(1) : '—';
-                const diff = row.baseline != null && row.actualPain != null ? row.baseline - row.actualPain : null;
-                let improved = '—';
-                let cls = '';
-                if (diff != null) {
-                    if (diff > thresh) {
-                        improved = '<span class="badge">Yes (' + diff.toFixed(1) + ')</span>';
-                        cls = 'improved';
-                    } else if (diff < -thresh) {
-                        improved = '<span class="badge">Worse (' + (-diff).toFixed(1) + ')</span>';
-                        cls = 'worse';
-                    } else {
-                        improved = '<span class="badge">Same</span>';
-                        cls = 'same';
-                    }
-                }
-                html += `<tr>
-                    <td>${escapeHtml(row.date || '—')}</td>
-                    <td class="num">${row.reportedPain != null ? row.reportedPain.toFixed(1) : '—'}</td>
-                    <td class="num">${baseline}</td>
-                    <td class="num">${actual}</td>
-                    <td class="${cls}">${improved}</td>
-                </tr>`;
-            });
-            html += '</tbody></table></div>';
-            container.innerHTML = html;
+      // Barcode
+      const barcode = document.getElementById(`barcode_${callSid}`);
+      if (barcode) {
+        if (!voicedSeries.length) {
+          barcode.parentElement.innerHTML = '<div class="empty-state">No voiced timeline captured.</div>';
+        } else {
+          drawVoicedBarcode(barcode, voicedSeries);
         }
+      }
 
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text == null ? '' : String(text);
-            return div.innerHTML;
+      // Rolling indicators
+      const ind = document.getElementById(`ind_${callSid}`);
+      if (ind) {
+        if (!rolling60.length) {
+          ind.textContent = 'No rolling 60s indicators yet. This fills after at least 60 seconds of audio.';
+        } else {
+          const last = rolling60[rolling60.length - 1];
+          ind.textContent = formatIndicators(last);
         }
+      }
+    }
 
-        // Demo: sample timeseries; chart uses /api/actual-pain for actual pain line + table
-        const sampleTimeseries = [
-            { date: '02-08', mood: 5, physicalCondition: 4, painRating: 5 },
-            { date: '02-09', mood: 4, physicalCondition: 5, painRating: 5 },
-            { date: '02-10', mood: 6, physicalCondition: 5, painRating: 4 },
-            { date: '02-11', mood: 5, physicalCondition: 4, painRating: 5 },
-            { date: '02-12', mood: 7, physicalCondition: 6, painRating: 3 },
-            { date: '02-13', mood: 6, physicalCondition: 6, painRating: 4 },
-            { date: '02-14', mood: 6, physicalCondition: 5, painRating: 4 }
-        ];
-        createPainLineGraph('painChart', sampleTimeseries);
-    </script>
+    function drawVoicedBarcode(canvas, voicedSeries) {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      const w = Math.max(1, Math.floor(rect.width));
+      const h = Math.max(1, Math.floor(rect.height));
+
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+
+      // background
+      ctx.fillStyle = '#e9ecef';
+      ctx.fillRect(0, 0, w, h);
+
+      const n = voicedSeries.length;
+      const barW = Math.max(1, w / n);
+
+      for (let i = 0; i < n; i++) {
+        const v = voicedSeries[i].voicedPct;
+        // darker when voicedPct higher
+        const alpha = 0.15 + Math.min(0.85, Math.max(0, v));
+        ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+        ctx.fillRect(i * barW, 0, Math.ceil(barW), h);
+      }
+
+      // subtle overlay border
+      ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+      ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
+    }
+
+    function fnum(x, digits = 2) {
+      if (x == null || Number.isNaN(x)) return '—';
+      return Number(x).toFixed(digits);
+    }
+
+    function pct(x) {
+      if (x == null || Number.isNaN(x)) return '—';
+      return `${Math.round(x * 100)}%`;
+    }
+
+    function formatIndicators(s) {
+      // Match the screenshot style
+      const lines = [];
+      lines.push(`Silence percent last 60s: ${pct(s.silencePct)}`);
+      lines.push(`Voiced percent last 60s: ${pct(s.voicedPct)}`);
+      lines.push(`Median phrase length last 60s: ${s.medianPhraseLenSec != null ? fnum(s.medianPhraseLenSec, 2) + 's' : '—'}`);
+      lines.push(`Median pause length last 60s: ${s.medianPauseLenSec != null ? fnum(s.medianPauseLenSec, 2) + 's' : '—'}`);
+      lines.push(`Pauses per minute: ${s.pausesPerMin != null ? fnum(s.pausesPerMin, 0) : '—'}`);
+      lines.push(`Phrases per minute: ${s.phrasesPerMin != null ? fnum(s.phrasesPerMin, 0) : '—'}`);
+      lines.push(`Median F0 last 60s: ${s.medianF0Hz != null ? fnum(s.medianF0Hz, 2) + ' Hz' : '—'}`);
+      lines.push(`IQR F0 last 60s: ${s.iqrF0Hz != null ? fnum(s.iqrF0Hz, 2) + ' Hz' : '—'}`);
+      lines.push(`Spectral centroid mean 60s: ${s.spectralCentroidHz != null ? fnum(s.spectralCentroidHz, 2) + ' Hz' : '—'}`);
+      lines.push(`Spectral flatness mean 60s: ${s.spectralFlatness != null ? fnum(s.spectralFlatness, 3) : '—'}`);
+      lines.push(`Breathiness proxy 60s: ${s.breathinessProxy != null ? fnum(s.breathinessProxy, 3) : '—'}`);
+      lines.push(`Cough count last 60s: ${s.coughCount != null ? String(s.coughCount) : '—'}`);
+      lines.push(`Baseline Z silence: ${s.baselineZSilence != null ? fnum(s.baselineZSilence, 2) : '—'}`);
+      lines.push(`Baseline Z phrase length: ${s.baselineZPhraseLen != null ? fnum(s.baselineZPhraseLen, 2) : '—'}`);
+      lines.push(`Baseline Z pauses per min: ${s.baselineZPausesPerMin != null ? fnum(s.baselineZPausesPerMin, 2) : '—'}`);
+      lines.push(`Breathiness flag: ${s.breathinessFlag ? 'true' : 'false'}`);
+      lines.push(`Cough flag: ${s.coughFlag ? 'true' : 'false'}`);
+      lines.push(`Combined flag: ${s.combinedFlag ? 'true' : 'false'}`);
+      return lines.join('\n');
+    }
+
+    // Load call logs on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      loadCallLogs();
+    });
+
+    setInterval(loadCallLogs, 20000);
+  </script>
 </body>
 </html>
