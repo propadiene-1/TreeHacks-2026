@@ -13,6 +13,19 @@ const chroma = new CloudClient({
   database: 'second'
 });
 let transcriptCollection;
+let futureCallsCollection;
+
+async function initFutureCallsCollection() {
+    try {
+        futureCallsCollection = await chroma.getOrCreateCollection({
+            name: 'future_calls',
+            metadata: { 'hnsw:space': 'cosine' }
+        });
+        console.log('Future calls collection ready');
+    } catch (err) {
+        console.warn('Future calls collection not available:', err.message);
+    }
+}
 
 async function initChroma() {
     try {
@@ -26,7 +39,6 @@ async function initChroma() {
         transcriptCollection = null;
     }
 }
-initChroma();
 
 // Middleware
 app.use(express.json());
@@ -41,7 +53,6 @@ const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 const client = twilio(accountSid, authToken);
 const { generateFollowUpQuestion, autoScheduleFromTranscript, extractKeywordsFromTranscript } = require('./openai-calls');
 const scheduledCalls = [];
-const callList = []; //all calls, ever
 
 const conversations = new Map();
 
@@ -230,7 +241,7 @@ app.post('/make-call', async (req, res) => {
 });
 
 // CALL SCHEDULING FUNCTION (can be called from endpoint OR auto-scheduler)
-function scheduleRecurringCalls(phoneNumber, frequency, time, endDate) {
+async function scheduleRecurringCalls(phoneNumber, frequency, time, endDate) {
     phoneNumber = "+15108308921";
     const [hours, minutes] = time.split(':');
 
@@ -289,14 +300,38 @@ function scheduleRecurringCalls(phoneNumber, frequency, time, endDate) {
 
     console.log(`Scheduled ${frequency} calls at ${time} for ${phoneNumber}`);
     console.log(`calculate all future calls: `)
-    callList.append(getFutureCalls(scheduleObj,30)); //add next 30 to callList
+    const futureCalls = await getFutureCalls(scheduleObj,30); //add next 30 to callList
+    console.log(futureCalls)
+
+    if (futureCallsCollection) {
+        try{
+            for (const call of futureCalls) {
+                await futureCallsCollection.add({
+                    ids: [`${callId}_${call.scheduledTime.getTime()}`],
+                    documents: [`Future call to ${call.phoneNumber} at ${call.scheduledTime}`],
+                    metadatas: [{
+                        scheduleId: callId,
+                        phoneNumber: call.phoneNumber,
+                        scheduledTime: call.scheduledTime.toISOString(),
+                        frequency: call.frequency,
+                        status: 'scheduled'
+                    }]
+                });
+            } 
+        } catch (error) {
+            console.error('Failed to save future calls:', error);
+        }
+        console.log(`Saved ${futureCalls.length} future calls to database`);
+    }
+
+    console.log(`Scheduled ${frequency} calls at ${time} for ${phoneNumber}`);
 
     return { success: true, callId };
 }
 
 // scheduling endpoint (can be used from web app)
 // Request format-- phoneNumber: '[number]', frequency: 'daily' or 'weekly', time: 'HH:MM', endDate: 'YYYY-MM-DDTHH:MM:SS'
-app.post('/schedule-recurring', (req, res) => {
+app.post('/schedule-recurring', async (req, res) => {
     const { phoneNumber, frequency, time = '09:00', endDate } = req.body;
     
     if (!phoneNumber || !frequency) {
@@ -304,7 +339,7 @@ app.post('/schedule-recurring', (req, res) => {
     }
     
     try {
-        const result = scheduleRecurringCalls(phoneNumber, frequency, time, endDate);
+        const result = await scheduleRecurringCalls(phoneNumber, frequency, time, endDate);
         
         res.json({
             success: true,
@@ -419,18 +454,35 @@ app.post('/call-status', async (req, res) => {
 });
 
 //get future calls based on current rules
-app.get('/all-future-calls', (req, res) => {
-    // Flatten the list of lists into one array
-    const allCalls = callList.flat();
-    res.json({ 
-        calls: allCalls.sort((a, b) => 
-            new Date(a.scheduledTime) - new Date(b.scheduledTime)
-        )
-    });
+app.get('/all-future-calls', async (req, res) => {
+    //GET FROM CHROMA DB
+    try {
+        if (!futureCallsCollection) {
+            return res.json({ calls: [] });
+        }
+
+        const data = await futureCallsCollection.get();
+        
+        const calls = data.metadatas.map(meta => ({
+            phoneNumber: meta.phoneNumber,
+            scheduledTime: meta.scheduledTime,
+            frequency: meta.frequency,
+            scheduleId: meta.scheduleId,
+            status: meta.status
+        }));
+        
+        // Sort by time
+        calls.sort((a, b) => new Date(a.scheduledTime) - new Date(b.scheduledTime));
+        
+        res.json({ calls });
+    } catch (error) {
+        console.error('Error fetching future calls:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 //Schedule the next 30 calls based on cron rule
-function getFutureCalls(schedule, limit = 30) {
+async function getFutureCalls(schedule, limit = 30) {
     const calls = [];
     const [hours, minutes] = schedule.time.split(':');
     const now = new Date();
@@ -472,9 +524,20 @@ function getFutureCalls(schedule, limit = 30) {
     return calls;
 }
 
-app.listen(port, () => {
+async function startServer() {
+    await initChroma();
+    await initFutureCallsCollection();
+    
+    app.listen(port, () => {
+        console.log(`Server running at http://localhost:${port}`);
+    });
+}
+
+startServer();
+
+/*app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
-});
+});*/
 
 // Get AI follow-up question (keeping this for web interface)
 /*app.post('/get-followup', async (req, res) => {
