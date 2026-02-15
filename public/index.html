@@ -3,22 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MedSek</title>
+    <title>MedSec</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <h1>AI Medical Assistant</h1>
-        <textarea id="queryInput" placeholder="Enter medical query"></textarea>
-        <button id="askAIButton">Send Query</button> <!-- for testing: remove later -->
-        <div id="aiResponse" style="display: none;"></div> <!--display response below!-->
+    <div class="wave-container">
+        <div class="wave wave1"></div>
+        <div class="wave wave2"></div>
+        <div class="wave wave3"></div>
+        <div class="wave wave4"></div>
     </div>
+    
     <div class="container">
-        <h1>Call Me</h1>
-        <input type="tel" id="phoneNumber" placeholder="Enter your phone number" />
-        <button id="callButton">Call Now</button>
-        <div id="status"></div>
+        <div class="content-box">
+            <h1><span class="med">Med</span> <span class="sec">Sec</span></h1>
+            <div class="input-group">
+                <input type="tel" id="phoneNumber" placeholder="Enter your phone number" />
+            </div>
+            <div class="button-group">
+                <button id="callButton" class="btn btn-primary">Sign Up</button>
+                <button id="dashboardButton" class="btn btn-secondary">View Dashboard</button>
+            </div>
+            <div id="status"></div>
+        </div>
     </div>
+    
     <script src="script.js"></script>
+    <script>
+        document.getElementById('dashboardButton').addEventListener('click', function() {
+            window.location.href = 'dashboard.html';
+        });
+    </script>
 </body>
 </html>
