@@ -324,136 +324,25 @@
 
     <div class="container">
         <a href="index.html" class="back-link">← Back to Home</a>
-        
-        <div class="content-wrapper">
-            <div class="scheduler-section">
-                <h2>📞 Test Scheduler</h2>
-                
-                <input type="tel" id="phoneNumber" placeholder="+15551234567">
-                
-                <select id="frequency">
-                    <option value="">Select frequency</option>
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                </select>
-                
-                <input type="time" id="time" value="09:00">
-                
-                <button id="scheduleCallButton">Schedule Call</button>
-                <button id="displayScheduledCalls">Show Scheduled Calls</button>
-                
-                <div id="status"></div>
-                <div id="scheduledCallsList"></div>
-            </div>
-
-            <section class="chart-section" aria-label="Pain over time">
-                <h2>📊 Pain over time</h2>
-                <div class="chart-wrap">
-                    <canvas id="painChart"></canvas>
-                </div>
-                <div class="readings-table-section">
-                    <h3>Readings per day</h3>
-                    <div id="painReadingsTable"></div>
-                </div>
-            </section>
-        </div>
     </div>
+
+    <section class="chart-section" aria-label="Pain over time">
+        <h2>Pain over time</h2>
+        <div class="chart-wrap">
+            <canvas id="painChart"></canvas>
+        </div>
+        <div class="readings-table-section">
+            <h3>Readings per day</h3>
+            <div id="painReadingsTable"></div>
+        </div>
+    </section>
 
     <script>
         console.log('Script loaded!');
-        
-        const phoneInput = document.getElementById('phoneNumber');
-        const frequencyInput = document.getElementById('frequency');
+
         const timeInput = document.getElementById('time');
-        const scheduleCallButton = document.getElementById('scheduleCallButton');
-        const displayScheduledCalls = document.getElementById('displayScheduledCalls');
-        const scheduledCallsList = document.getElementById('scheduledCallsList');
         const statusDiv = document.getElementById('status');
         
-        console.log('Elements found:', { phoneInput, frequencyInput, scheduleCallButton });
-
-        // Schedule button
-        scheduleCallButton.addEventListener('click', async () => {
-            console.log('Button clicked!');
-            
-            const phoneNumber = phoneInput.value.trim();
-            const frequency = frequencyInput.value;
-            const time = timeInput.value;
-            
-            console.log('Values:', { phoneNumber, frequency, time });
-            
-            if (!phoneNumber) {
-                alert('Please enter phone number');
-                return;
-            }
-            
-            if (!frequency) {
-                alert('Please select frequency');
-                return;
-            }
-            
-            try {
-                const response = await fetch('/schedule-recurring', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phoneNumber, frequency, time })
-                });
-                
-                const data = await response.json();
-                console.log('Response:', data);
-                
-                if (response.ok) {
-                    statusDiv.textContent = '✅ ' + data.message;
-                    statusDiv.className = 'success';
-                    loadScheduledCalls();
-                } else {
-                    statusDiv.textContent = '❌ ' + data.error;
-                    statusDiv.className = 'error';
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                statusDiv.textContent = '❌ Failed: ' + error.message;
-                statusDiv.className = 'error';
-            }
-        });
-
-        // Display button
-        displayScheduledCalls.addEventListener('click', loadScheduledCalls);
-
-        async function loadScheduledCalls() {
-            console.log('Loading scheduled calls...');
-            
-            try {
-                const response = await fetch('/scheduled-calls');
-                const data = await response.json();
-                console.log('Scheduled calls:', data);
-                
-                if (data.calls.length === 0) {
-                    scheduledCallsList.innerHTML = '<p>No scheduled calls</p>';
-                    return;
-                }
-                
-                let html = '<table><tr><th>ID</th><th>Phone</th><th>Frequency</th><th>Time</th></tr>';
-                data.calls.forEach(call => {
-                    html += `<tr>
-                        <td>${call.id}</td>
-                        <td>${call.phoneNumber}</td>
-                        <td>${call.frequency}</td>
-                        <td>${call.time}</td>
-                    </tr>`;
-                });
-                html += '</table>';
-                scheduledCallsList.innerHTML = html;
-                
-            } catch (error) {
-                console.error('Error loading calls:', error);
-                scheduledCallsList.innerHTML = '<p style="color:red;">Error loading calls</p>';
-            }
-        }
-        
-        // Auto-load on page load
-        loadScheduledCalls();
-
         /**
          * Create a line graph: reported pain, expected pain (from mood & physical), and actual pain (corrected for perception bias + baseline).
          * Actual pain is fetched from POST /api/actual-pain (algorithm in pain-correction.js).
