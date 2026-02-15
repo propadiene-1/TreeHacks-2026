@@ -1,14 +1,16 @@
 const express = require('express');
 const twilio = require('twilio');
 const cron = require('node-cron');  //node-cron for scheduling
-const { ChromaClient } = require('chromadb');
+const { CloudClient } = require('chromadb');
 require('dotenv').config();
 
 const app = express();
-const port = 3000;
 
-// ChromaDB for persisting transcripts
-const chroma = new ChromaClient({ port: 8000 });
+const chroma = new CloudClient({
+  apiKey: process.env.CHROMA_API_KEY,
+  tenant: process.env.CHROMA_TENANT,
+  database: 'second'
+});
 let transcriptCollection;
 
 async function initChroma() {

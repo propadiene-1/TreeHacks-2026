@@ -1,5 +1,5 @@
 // scripts/populate-chroma.js - Standalone script to populate ChromaDB with fake medical call transcripts
-const { ChromaClient } = require('chromadb');
+const { CloudClient } = require('chromadb');
 require('dotenv').config();
 
 async function generateFakeTranscript(turns = 5) {
@@ -63,7 +63,11 @@ async function populateChroma() {
     console.log('🧬 Connecting to ChromaDB...');
     
     // Matches your server.js config (local port 8000)
-    const chroma = new ChromaClient({ port: 8000 });
+    const chroma = new CloudClient({
+        apiKey: process.env.CHROMA_API_KEY,
+        tenant: process.env.CHROMA_TENANT,
+        database: 'second'
+        });
     const collection = await chroma.getOrCreateCollection({
         name: 'call_transcripts',
         metadata: { 'hnsw:space': 'cosine' }
