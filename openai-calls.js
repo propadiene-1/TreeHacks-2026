@@ -319,7 +319,7 @@ async function analyzeTranscript(transcript) {
 module.exports = {
     generateFollowUpQuestion,
     autoScheduleFromTranscript,
-    extractKeywordsFromTranscript
+    extractKeywordsFromTranscript,
     extractDBColumns
     //analyzeTranscript
 };
