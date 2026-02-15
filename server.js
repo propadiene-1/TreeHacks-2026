@@ -32,19 +32,6 @@ const chroma = new CloudClient({
   database: 'second'
 });
 let transcriptCollection;
-//let futureCallsCollection;
-
-/*async function initFutureCallsCollection() {
-    try {
-        futureCallsCollection = await chroma.getOrCreateCollection({
-            name: 'future_calls',
-            metadata: { 'hnsw:space': 'cosine' }
-        });
-        console.log('Future calls collection ready');
-    } catch (err) {
-        console.warn('Future calls collection not available:', err.message);
-    }
-}*/
 
 async function initChroma() {
     try {
@@ -341,30 +328,6 @@ function scheduleRecurringCalls(phoneNumber, frequency, time, endDate) {
     scheduledCalls.push(scheduleObj);
 
     console.log(`Scheduled ${frequency} calls at ${time} for ${phoneNumber}`);
-    //console.log(`calculate all future calls: `)
-    //const futureCalls = await getFutureCalls(scheduleObj,30); //add next 30 to callList
-    //console.log(futureCalls)
-
-    /*if (futureCallsCollection) {
-        try{
-            for (const call of futureCalls) {
-                await futureCallsCollection.add({
-                    ids: [`${callId}_${call.scheduledTime.getTime()}`],
-                    documents: [`Future call to ${call.phoneNumber} at ${call.scheduledTime}`],
-                    metadatas: [{
-                        scheduleId: callId,
-                        phoneNumber: call.phoneNumber,
-                        scheduledTime: call.scheduledTime.toISOString(),
-                        frequency: call.frequency,
-                        status: 'scheduled'
-                    }]
-                });
-            } 
-        } catch (error) {
-            console.error('Failed to save future calls:', error);
-        }
-        console.log(`Saved ${futureCalls.length} future calls to database`);
-    }*/
 
     console.log(`Scheduled ${frequency} calls at ${time} for ${phoneNumber}`);
 
@@ -510,34 +473,6 @@ app.post('/call-status', async (req, res) => {
 
     res.sendStatus(200);
 });
-
-//get future calls based on current rules
-/*app.get('/all-future-calls', async (req, res) => {
-    //GET FROM CHROMA DB
-    try {
-        if (!futureCallsCollection) {
-            return res.json({ calls: [] });
-        }
-
-        const data = await futureCallsCollection.get();
-        
-        const calls = data.metadatas.map(meta => ({
-            phoneNumber: meta.phoneNumber,
-            scheduledTime: meta.scheduledTime,
-            frequency: meta.frequency,
-            scheduleId: meta.scheduleId,
-            status: meta.status
-        }));
-        
-        // Sort by time
-        calls.sort((a, b) => new Date(a.scheduledTime) - new Date(b.scheduledTime));
-        
-        res.json({ calls });
-    } catch (error) {
-        console.error('Error fetching future calls:', error);
-        res.status(500).json({ error: error.message });
-    }
-});*/
 
 const server = http.createServer(app);
 
