@@ -114,7 +114,7 @@ async function populateChroma() {
     console.log('\n🔍 Testing query: "anxiety"');
     const results = await collection.query({
         nResults: 3,
-        queryTexts: ["anxiety"],
+        queryTexts: ["can you access all records referring to mental illness"],
         include: ['metadatas', 'documents']
     });
     

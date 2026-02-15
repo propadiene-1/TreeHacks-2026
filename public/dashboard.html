@@ -3,37 +3,361 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Scheduler</title>
+    <title>Dashboard · med sec</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&family=Coiny&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sour+Gummy:wght@700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        input, select, button { display: block; margin: 10px 0; padding: 10px; width: 300px; }
-        button { background: #667eea; color: white; border: none; cursor: pointer; }
-        #status { margin-top: 20px; padding: 10px; border-radius: 5px; }
-        .success { background: #d4edda; color: #155724; }
-        .error { background: #f8d7da; color: #721c24; }
-        table { border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background: #667eea; color: white; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body { 
+            font-family: 'Quicksand', sans-serif;
+            background: linear-gradient(135deg, #5ca4c4 0%, #3686b0 100%);
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Wave animations from index.html */
+        .wave-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .wave {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 200%;
+            height: 100%;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.1) 100%);
+            border-radius: 50% 50% 0 0;
+            animation: wave 15s ease-in-out infinite;
+        }
+
+        .wave1 { animation-delay: 0s; opacity: 0.3; }
+        .wave2 { animation-delay: 2s; opacity: 0.2; }
+        .wave3 { animation-delay: 4s; opacity: 0.15; }
+        .wave4 { animation-delay: 6s; opacity: 0.1; }
+
+        @keyframes wave {
+            0%, 100% { transform: translateX(0) translateY(0); }
+            50% { transform: translateX(-25%) translateY(-10%); }
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        h1 {
+            font-family: 'Sour Gummy', cursive;
+            font-size: 3rem;
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .med {
+            color: #FFD700;
+        }
+
+        .sec {
+            color: #87CEEB;
+        }
+
+        .content-wrapper {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .scheduler-section {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .scheduler-section h2 {
+            color: #3686b0;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        input, select {
+            display: block;
+            margin: 15px 0;
+            padding: 12px 15px;
+            width: 100%;
+            max-width: 400px;
+            border: 2px solid #e0e8ec;
+            border-radius: 10px;
+            font-family: 'Quicksand', sans-serif;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #3686b0;
+            box-shadow: 0 0 0 3px rgba(54, 134, 176, 0.1);
+        }
+
+        button {
+            background: linear-gradient(135deg, #5ca4c4 0%, #3686b0 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 10px;
+            padding: 12px 25px;
+            font-family: 'Quicksand', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 10px 10px 10px 0;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(92, 164, 196, 0.4);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(92, 164, 196, 0.6);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        #status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #f5c6cb;
+        }
+
+        table {
+            border-collapse: collapse;
+            margin-top: 20px;
+            width: 100%;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        th, td {
+            border: 1px solid #e0e8ec;
+            padding: 12px 15px;
+            text-align: left;
+        }
+
+        th {
+            background: linear-gradient(135deg, #5ca4c4 0%, #3686b0 100%);
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #f8fcfd;
+        }
+
+        .chart-section {
+            margin-top: 30px;
+            padding: 25px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .chart-section h2 {
+            margin: 0 0 20px 0;
+            font-size: 1.5rem;
+            color: #3686b0;
+            font-weight: 600;
+        }
+
+        .chart-wrap {
+            position: relative;
+            height: 350px;
+            margin-top: 20px;
+        }
+
+        .readings-table-section {
+            margin-top: 30px;
+        }
+
+        .readings-table-section h3 {
+            margin: 0 0 15px 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #3686b0;
+        }
+
+        .pain-readings-table-wrap {
+            overflow: hidden;
+            border-radius: 12px;
+            border: 1px solid #e0e8ec;
+            box-shadow: 0 2px 8px rgba(54, 134, 176, 0.1);
+            background: #fff;
+        }
+
+        .pain-readings-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+
+        .pain-readings-table thead th {
+            background: linear-gradient(135deg, #5ca4c4 0%, #3686b0 100%);
+            color: #fff;
+            font-weight: 600;
+            text-align: left;
+            padding: 14px 18px;
+            white-space: nowrap;
+        }
+
+        .pain-readings-table thead th:first-child { padding-left: 20px; }
+        .pain-readings-table thead th:last-child { padding-right: 20px; }
+
+        .pain-readings-table tbody tr {
+            border-bottom: 1px solid #eef4f7;
+            transition: background 0.15s ease;
+        }
+
+        .pain-readings-table tbody tr:hover { background: #f8fcfd; }
+        .pain-readings-table tbody tr:last-child { border-bottom: none; }
+        .pain-readings-table tbody tr:nth-child(even) { background: #fafcfd; }
+        .pain-readings-table tbody tr:nth-child(even):hover { background: #f0f8fb; }
+
+        .pain-readings-table td {
+            padding: 14px 18px;
+            color: #333;
+        }
+
+        .pain-readings-table td:first-child { padding-left: 20px; font-weight: 500; color: #3686b0; }
+        .pain-readings-table td:last-child { padding-right: 20px; }
+        .pain-readings-table td.num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            color: #444;
+        }
+
+        .pain-readings-table .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .pain-readings-table .improved .badge {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .pain-readings-table .worse .badge {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .pain-readings-table .same .badge {
+            background: #e9ecef;
+            color: #495057;
+        }
+
+        /* Back button */
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .back-link:hover {
+            transform: translateX(-5px);
+        }
     </style>
 </head>
 <body>
-    <h1>📞 Test Scheduler</h1>
-    
-    <input type="tel" id="phoneNumber" placeholder="+15551234567">
-    
-    <select id="frequency">
-        <option value="">Select frequency</option>
-        <option value="daily">Daily</option>
-        <option value="weekly">Weekly</option>
-    </select>
-    
-    <input type="time" id="time" value="09:00">
-    
-    <button id="scheduleCallButton">Schedule Call</button>
-    <button id="displayScheduledCalls">Show Scheduled Calls</button>
-    
-    <div id="status"></div>
-    <div id="scheduledCallsList"></div>
+    <div class="wave-container">
+        <div class="wave wave1"></div>
+        <div class="wave wave2"></div>
+        <div class="wave wave3"></div>
+        <div class="wave wave4"></div>
+    </div>
+
+    <div class="container">
+        <a href="index.html" class="back-link">← Back to Home</a>
+        
+        <div class="content-wrapper">
+            <div class="scheduler-section">
+                <h2>📞 Test Scheduler</h2>
+                
+                <input type="tel" id="phoneNumber" placeholder="+15551234567">
+                
+                <select id="frequency">
+                    <option value="">Select frequency</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                </select>
+                
+                <input type="time" id="time" value="09:00">
+                
+                <button id="scheduleCallButton">Schedule Call</button>
+                <button id="displayScheduledCalls">Show Scheduled Calls</button>
+                
+                <div id="status"></div>
+                <div id="scheduledCallsList"></div>
+            </div>
+
+            <section class="chart-section" aria-label="Pain over time">
+                <h2>📊 Pain over time</h2>
+                <div class="chart-wrap">
+                    <canvas id="painChart"></canvas>
+                </div>
+                <div class="readings-table-section">
+                    <h3>Readings per day</h3>
+                    <div id="painReadingsTable"></div>
+                </div>
+            </section>
+        </div>
+    </div>
 
     <script>
         console.log('Script loaded!');
@@ -129,6 +453,185 @@
         
         // Auto-load on page load
         loadScheduledCalls();
+
+        /**
+         * Create a line graph: reported pain, expected pain (from mood & physical), and actual pain (corrected for perception bias + baseline).
+         * Actual pain is fetched from POST /api/actual-pain (algorithm in pain-correction.js).
+         * @param {string} canvasId - Id of the <canvas> element.
+         * @param {Array<{date: string, mood: number, physicalCondition: number, painRating: number}>} timeseries - 0–10 scales.
+         * @param {Object} [options] - Optional { baseline } for fixed baseline pain.
+         * @returns {Promise<Chart>} Chart.js instance.
+         */
+        async function createPainLineGraph(canvasId, timeseries, options = {}) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return null;
+
+            const labels = timeseries.map(d => d.date);
+            const reportedPain = timeseries.map(d => d.painRating);
+
+            // Expected pain from mood & physical only (no baseline): 10 - (mood + physical)/2
+            function expectedFromMoodAndPhysical(mood, physicalCondition) {
+                const raw = 10 - (mood + physicalCondition) / 2;
+                return Math.max(0, Math.min(10, raw));
+            }
+            const expectedPain = timeseries.map(d => expectedFromMoodAndPhysical(d.mood, d.physicalCondition));
+
+            // Actual pain: perception-bias correction + baseline (from server algorithm)
+            let actualPainData = [];
+            let actualPain = [];
+            try {
+                const res = await fetch('/api/actual-pain', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ timeseries, options })
+                });
+                const json = await res.json();
+                if (json.data && json.data.length) {
+                    actualPainData = json.data;
+                    actualPain = actualPainData.map(r => r.actualPain);
+                }
+            } catch (e) {
+                console.warn('Actual pain API failed, using corrected only in UI', e);
+                actualPain = timeseries.map(() => null);
+            }
+            const hasActual = actualPain.length === labels.length && actualPain.some(v => v != null);
+
+            if (window._painChartInstance) {
+                window._painChartInstance.destroy();
+            }
+
+            const datasets = [
+                {
+                    label: 'Reported pain',
+                    data: reportedPain,
+                    borderColor: '#5ca4c4',
+                    backgroundColor: 'rgba(92, 164, 196, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    borderWidth: 2
+                },
+                {
+                    label: 'Expected pain (from mood & physical)',
+                    data: expectedPain,
+                    borderColor: '#82c0d8',
+                    backgroundColor: 'rgba(130, 192, 216, 0.05)',
+                    borderDash: [5, 5],
+                    fill: false,
+                    tension: 0.3,
+                    borderWidth: 2
+                }
+            ];
+            if (hasActual) {
+                datasets.push({
+                    label: 'Actual pain (corrected + baseline)',
+                    data: actualPain,
+                    borderColor: '#2477a6',
+                    backgroundColor: 'rgba(36, 119, 166, 0.1)',
+                    fill: false,
+                    tension: 0.3,
+                    borderWidth: 2
+                });
+            }
+
+            window._painChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 10,
+                            title: { display: true, text: 'Pain / score (0–10)' },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        x: { 
+                            title: { display: true, text: 'Date' },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        }
+                    },
+                    plugins: { 
+                        legend: { 
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    family: 'Quicksand'
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Table: readings per day, baseline, pain improved
+            if (actualPainData.length) {
+                renderPainReadingsTable(actualPainData);
+            }
+
+            return window._painChartInstance;
+        }
+
+        /**
+         * Render table: Date | Reported | Baseline | Actual | Pain improved
+         * @param {Array<{date?: string, reportedPain: number, baseline: number, actualPain: number}>} data - from /api/actual-pain
+         */
+        function renderPainReadingsTable(data) {
+            const container = document.getElementById('painReadingsTable');
+            if (!container) return;
+            const thresh = 0.3; // same if |baseline - actual| <= thresh
+            let html = '<div class="pain-readings-table-wrap"><table class="pain-readings-table"><thead><tr><th>Date</th><th>Reported pain</th><th>Baseline pain</th><th>Actual pain</th><th>Pain improved</th></tr></thead><tbody>';
+            data.forEach(row => {
+                const baseline = row.baseline != null ? row.baseline.toFixed(1) : '—';
+                const actual = row.actualPain != null ? row.actualPain.toFixed(1) : '—';
+                const diff = row.baseline != null && row.actualPain != null ? row.baseline - row.actualPain : null;
+                let improved = '—';
+                let cls = '';
+                if (diff != null) {
+                    if (diff > thresh) {
+                        improved = '<span class="badge">Yes (' + diff.toFixed(1) + ')</span>';
+                        cls = 'improved';
+                    } else if (diff < -thresh) {
+                        improved = '<span class="badge">Worse (' + (-diff).toFixed(1) + ')</span>';
+                        cls = 'worse';
+                    } else {
+                        improved = '<span class="badge">Same</span>';
+                        cls = 'same';
+                    }
+                }
+                html += `<tr>
+                    <td>${escapeHtml(row.date || '—')}</td>
+                    <td class="num">${row.reportedPain != null ? row.reportedPain.toFixed(1) : '—'}</td>
+                    <td class="num">${baseline}</td>
+                    <td class="num">${actual}</td>
+                    <td class="${cls}">${improved}</td>
+                </tr>`;
+            });
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text == null ? '' : String(text);
+            return div.innerHTML;
+        }
+
+        // Demo: sample timeseries; chart uses /api/actual-pain for actual pain line + table
+        const sampleTimeseries = [
+            { date: '02-08', mood: 5, physicalCondition: 4, painRating: 5 },
+            { date: '02-09', mood: 4, physicalCondition: 5, painRating: 5 },
+            { date: '02-10', mood: 6, physicalCondition: 5, painRating: 4 },
+            { date: '02-11', mood: 5, physicalCondition: 4, painRating: 5 },
+            { date: '02-12', mood: 7, physicalCondition: 6, painRating: 3 },
+            { date: '02-13', mood: 6, physicalCondition: 6, painRating: 4 },
+            { date: '02-14', mood: 6, physicalCondition: 5, painRating: 4 }
+        ];
+        createPainLineGraph('painChart', sampleTimeseries);
     </script>
 </body>
 </html>
