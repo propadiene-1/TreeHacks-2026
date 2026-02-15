@@ -45,6 +45,9 @@ async function initChroma() {
         transcriptCollection = null;
     }
 }
+(async () => {
+    await initChroma();
+})();
 
 // Middleware
 app.use(express.json());
@@ -57,7 +60,7 @@ const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
 const client = twilio(accountSid, authToken);
-const { generateFollowUpQuestion, autoScheduleFromTranscript, extractKeywordsFromTranscript } = require('./openai-calls');
+const { generateFollowUpQuestion, autoScheduleFromTranscript, extractDBColumns } = require('./openai-calls');
 const { actualPainFromTimeseries } = require('./pain-correction');
 const scheduledCalls = [];
 
@@ -434,24 +437,27 @@ app.post('/call-status', async (req, res) => {
                 (async () => {
                     try {
                         //const keywords = await extractKeywordsFromTranscript(transcriptString);
+                        console.log('Extracting medical features...');
+                        const features = await extractDBColumns(transcriptString, phoneNumber);
                         await transcriptCollection.add({
                             ids: [`transcript_${callSid}_${Date.now()}`],
                             documents: [JSON.stringify(conversationData)],
                             metadatas: [{
                                 callSid,
                                 created_at: new Date().toISOString(),
-                                //created_at_ts: Date.now(),
-                                //pair_count: conversationData.length,
-                                //keywords: keywords.join(', ')
-                                pain_rating,
-                                pain_phrases,
-                                body_parts,
-                                body_part_phrases,
-                                daily_mood,
-                                estimated_health_metrics
+                                pain_rating: features.pain_rating,
+                                pain_phrases: JSON.stringify(features.pain_phrases || []),
+                                body_parts: JSON.stringify(features.body_parts || []),
+                                body_part_phrases: JSON.stringify(features.body_part_phrases || []),
+                                daily_mood: features.daily_mood || '',
+                                estimated_health_metrics: JSON.stringify(features.estimated_health_metrics || {})
                             }]
                         });
-                        console.log(`[${callSid}] Saved to ChromaDB on call end (${conversationData.length} Q&A pairs)`);
+                        console.log(`[${callSid}] Saved to ChromaDB with extracted features:`, {
+                            pain_rating: features.pain_rating,
+                            daily_mood: features.daily_mood,
+                            body_parts: features.body_parts
+                        });
                     } catch (err) {
                         console.warn('ChromaDB save failed:', err.message);
                     }
