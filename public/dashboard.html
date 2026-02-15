@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Scheduler</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        input, select, button { display: block; margin: 10px 0; padding: 10px; width: 300px; }
+        button { background: #667eea; color: white; border: none; cursor: pointer; }
+        #status { margin-top: 20px; padding: 10px; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        table { border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #667eea; color: white; }
+    </style>
+</head>
+<body>
+    <h1>📞 Test Scheduler</h1>
+    
+    <input type="tel" id="phoneNumber" placeholder="+15551234567">
+    
+    <select id="frequency">
+        <option value="">Select frequency</option>
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+    </select>
+    
+    <input type="time" id="time" value="09:00">
+    
+    <button id="scheduleCallButton">Schedule Call</button>
+    <button id="displayScheduledCalls">Show Scheduled Calls</button>
+    
+    <div id="status"></div>
+    <div id="scheduledCallsList"></div>
+
+    <script>
+        console.log('Script loaded!');
+        
+        const phoneInput = document.getElementById('phoneNumber');
+        const frequencyInput = document.getElementById('frequency');
+        const timeInput = document.getElementById('time');
+        const scheduleCallButton = document.getElementById('scheduleCallButton');
+        const displayScheduledCalls = document.getElementById('displayScheduledCalls');
+        const scheduledCallsList = document.getElementById('scheduledCallsList');
+        const statusDiv = document.getElementById('status');
+        
+        console.log('Elements found:', { phoneInput, frequencyInput, scheduleCallButton });
+
+        // Schedule button
+        scheduleCallButton.addEventListener('click', async () => {
+            console.log('Button clicked!');
+            
+            const phoneNumber = phoneInput.value.trim();
+            const frequency = frequencyInput.value;
+            const time = timeInput.value;
+            
+            console.log('Values:', { phoneNumber, frequency, time });
+            
+            if (!phoneNumber) {
+                alert('Please enter phone number');
+                return;
+            }
+            
+            if (!frequency) {
+                alert('Please select frequency');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/schedule-recurring', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phoneNumber, frequency, time })
+                });
+                
+                const data = await response.json();
+                console.log('Response:', data);
+                
+                if (response.ok) {
+                    statusDiv.textContent = '✅ ' + data.message;
+                    statusDiv.className = 'success';
+                    loadScheduledCalls();
+                } else {
+                    statusDiv.textContent = '❌ ' + data.error;
+                    statusDiv.className = 'error';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.textContent = '❌ Failed: ' + error.message;
+                statusDiv.className = 'error';
+            }
+        });
+
+        // Display button
+        displayScheduledCalls.addEventListener('click', loadScheduledCalls);
+
+        async function loadScheduledCalls() {
+            console.log('Loading scheduled calls...');
+            
+            try {
+                const response = await fetch('/scheduled-calls');
+                const data = await response.json();
+                console.log('Scheduled calls:', data);
+                
+                if (data.calls.length === 0) {
+                    scheduledCallsList.innerHTML = '<p>No scheduled calls</p>';
+                    return;
+                }
+                
+                let html = '<table><tr><th>ID</th><th>Phone</th><th>Frequency</th><th>Time</th></tr>';
+                data.calls.forEach(call => {
+                    html += `<tr>
+                        <td>${call.id}</td>
+                        <td>${call.phoneNumber}</td>
+                        <td>${call.frequency}</td>
+                        <td>${call.time}</td>
+                    </tr>`;
+                });
+                html += '</table>';
+                scheduledCallsList.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Error loading calls:', error);
+                scheduledCallsList.innerHTML = '<p style="color:red;">Error loading calls</p>';
+            }
+        }
+        
+        // Auto-load on page load
+        loadScheduledCalls();
+    </script>
+</body>
+</html>

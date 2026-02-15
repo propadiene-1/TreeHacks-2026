@@ -2,8 +2,7 @@ const callButton = document.getElementById('callButton');
 const phoneInput = document.getElementById('phoneNumber');
 const statusDiv = document.getElementById('status');
 const queryInput = document.getElementById('queryInput');
-const askAIButton = document.getElementById('askAIButton'); //for testing only
-const aiResponse = document.getElementById('aiResponse');
+const modal = document.getElementById('settings-modal');
 
 callButton.addEventListener('click', async () => {
     const phoneNumber = phoneInput.value.trim();
@@ -50,46 +49,20 @@ function showStatus(message, type) {
     statusDiv.className = type;
 }
 
-//for testing: make it automatic later
-askAIButton.addEventListener('click', getAIFollowUp);
+//open toggle in css
+document.querySelector('.settings-gear').onclick = () => modal.style.display = 'block';
 
-// Function to get AI follow-up question
-async function getAIFollowUp() {
-    
-    const query = queryInput.value.trim();
-    
-    if (!query) {
-        alert('Please enter a medical query first');
-        return;
-    }
-    
-    showAIResponse('Thinking about how to respond...', 'info');
+//close toggle in css
+document.querySelector('.close').onclick = () => modal.style.display = 'none';
+window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; }
 
-    try {
-        const response = await fetch('/get-followup', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ query: query })
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-            showAIResponse(`${data.followUpQuestion}`, 'success');
-            console.log('AI Follow-up Question:', data.followUpQuestion);
-        } else {
-            showAIResponse(`Couldn't generate follow-up. Error: ${data.error}`, 'error');
-        }
-    } catch (error) {
-        alert('Failed to get AI response');
-        console.error('Error:', error);
-    }
-}
-
-function showAIResponse(message, type) {
-    aiResponse.textContent = message;
-    aiResponse.className = type;
-    aiResponse.style.display = 'block';
-}
+//save demographics into localStorage
+document.getElementById('save-settings').onclick = () => {
+    localStorage.setItem('settings', JSON.stringify({
+        age: document.getElementById('age').value,
+        sex: document.getElementById('sex').value,
+        conditions: document.getElementById('conditions').value,
+        family: document.getElementById('family').value
+    }));
+    modal.style.display = 'none';   //close popup on save
+};
