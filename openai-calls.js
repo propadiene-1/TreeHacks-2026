@@ -87,7 +87,7 @@ async function extractDBColumns(transcript, phoneNumber) {
                             properties: {
                                 pain_rating: {
                                     type: "number",
-                                    description: "Pain rating from 1-7. ONLY if patient was explicitly asked and responded with a number. If range given, return average. Return null if not asked/answered.",
+                                    description: "Pain rating from 1-7. If not mentioned, record your best estimate based on what the patient has described. It must be a number from 1 to 7. If range given, return the average.",
                                     nullable: true,
                                     minimum: 1,
                                     maximum: 7
@@ -116,7 +116,7 @@ async function extractDBColumns(transcript, phoneNumber) {
                                     description: "Physical health measurements mentioned or estimated (e.g. body temperature--(e.g. 98.6°F, fever, normal), blood pressure-- (e.g. 00, 120/80, high, normal), heart rate -- (e.g. 72 bpm, racing, normal)), any other physical measurements mentioned",
                                 }
                             },
-                            required: ["pain_rating", "pain_phrases", "symptom_keywords", "symptom_phrases", "body_parts", "body_part_phrases", "daily_mood", "estimated_health_metrics"]
+                            required: ["pain_rating", "pain_phrases", "body_parts", "body_part_phrases", "daily_mood", "estimated_health_metrics"]
                         }
                     }
                 }
@@ -243,12 +243,19 @@ async function autoScheduleFromTranscript(transcript, phoneNumber, scheduleFunct
     }
 }
 
+module.exports = {
+    generateFollowUpQuestion,
+    autoScheduleFromTranscript,
+    //extractKeywordsFromTranscript,
+    extractDBColumns
+};
+
 /**
  * Extract health/symptom keywords from a conversation transcript
  * @param {string} transcript - Full conversation transcript
  * @returns {Promise<string[]>} - Array of keyword strings
  */
-async function extractKeywordsFromTranscript(transcript) {
+/*async function extractKeywordsFromTranscript(transcript) {
     try {
         const response = await openai.chat.completions.create({
             model: "gpt-4o-mini",
@@ -276,50 +283,4 @@ async function extractKeywordsFromTranscript(transcript) {
         console.error('OpenAI keyword extraction error:', error);
         return [];
     }
-}
-
-/**
- * Analyze a full conversation transcript
- * @param {string} transcript - Full medical conversation transcript
- * @returns {Promise<object>} - Structured medical summary
- */
-async function analyzeTranscript(transcript) {
-    try {
-        const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-                {
-                    role: "system",
-                    content: `You are a medical transcription analyst. Extract key information from patient conversations.
-                    Return a JSON object with: symptoms, duration, severity, medical_history, medications, next_steps.`
-                },
-                {
-                    role: "user",
-                    content: `Analyze this medical conversation:\n\n${transcript}`
-                }
-            ],
-            max_tokens: 500,
-            temperature: 0.3
-        });
-
-        const analysis = response.choices[0].message.content.trim();
-        
-        // Try to parse as JSON, fallback to raw text
-        try {
-            return JSON.parse(analysis);
-        } catch {
-            return { summary: analysis };
-        }
-    } catch (error) {
-        console.error('OpenAI API Error:', error);
-        throw new Error('Failed to analyze transcript');
-    }
-}
-
-module.exports = {
-    generateFollowUpQuestion,
-    autoScheduleFromTranscript,
-    extractKeywordsFromTranscript,
-    extractDBColumns
-    //analyzeTranscript
-};
+}*/
