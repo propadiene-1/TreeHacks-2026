@@ -8,39 +8,158 @@ const openai = new OpenAI({
 });
 
 /**
- * Generate follow-up questions based on user's medical query
- * @param {string} userQuery - The initial question or transcript from user
- * @returns {Promise<string>} - AI-generated follow-up question
+ * Generate follow-up question with symptom context
  */
-async function generateFollowUpQuestion(userQuery) {
+async function generateFollowUpQuestion(transcript, symptomContext = "") {
     try {
         const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-                {
-                    role: "user",
-                    content: `A medical patient has stated the following: ${userQuery}. Generate an information-seeking follow-up question without speculating on the patient's condition, with the goal of reporting to a doctor.`
-                }
-            ],
-            max_tokens: 100,
-            temperature: 0.7
+            model: 'gpt-4o',
+            messages: [{
+                role: 'system',
+                content: `You are a compassionate healthcare assistant.
+
+${symptomContext}
+
+- Prioritize OVERDUE symptoms
+- Reference previous symptom history
+- Ask about progression (better/worse/same)
+- Keep responses brief (1-2 sentences)
+- Be empathetic and natural`
+            }, {
+                role: 'user',
+                content: transcript
+            }],
+            temperature: 0.7,
+            max_tokens: 150
         });
 
         return response.choices[0].message.content.trim();
     } catch (error) {
-        console.error('OpenAI API Error:', error);
-        throw new Error('Failed to generate follow-up question');
+        console.error('OpenAI error:', error);
+        throw error;
+    }
+}
+
+
+async function extractDBColumns(transcript, phoneNumber) {
+    try {
+        transcript = transcript.join(" ")
+        
+    } catch (error) {
+        console.error('Auto-scheduling failed:', error);
+        throw error;
+    }
+}
+
+/**
+ * Extract structured medical data from transcript
+ * @param {Array|string} transcript - Full conversation transcript
+ * @param {string} phoneNumber - Patient's phone number
+ * @returns {Object} - Structured medical features
+ */
+async function extractDBColumns(transcript, phoneNumber) {
+    try {
+        // Convert array to string if needed
+        const transcriptText = Array.isArray(transcript) 
+            ? transcript.join("\n") 
+            : transcript;
+        
+        console.log('Extracting medical features from transcript...');
+        
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+                {
+                    role: "system",
+                    content: `You are a medical data extraction assistant. Extract specific features from patient conversation transcripts. Be precise and only extract explicitly mentioned information.`
+                },
+                {
+                    role: "user",
+                    content: `Extract the following from this medical conversation transcript:\n\n${transcriptText}`
+                }
+            ],
+            tools: [
+                {
+                    type: "function",
+                    function: {
+                        name: "extract_medical_features",
+                        description: "Extract structured medical data from patient transcript",
+                        parameters: {
+                            type: "object",
+                            properties: {
+                                pain_rating: {
+                                    type: "number",
+                                    description: "Pain rating from 1-7. If not mentioned, record your best estimate based on what the patient has described. It must be a number from 1 to 7. If range given, return the average.",
+                                    nullable: true,
+                                    minimum: 1,
+                                    maximum: 7
+                                },
+                                pain_phrases: {
+                                    type: "array",
+                                    items: { type: "string" },
+                                    description: "List of exact phrases related to pain (e.g., 'sharp pain in chest', 'dull ache', 'throbbing headache')"
+                                },
+                                body_parts: {
+                                    type: "array",
+                                    items: { type: "string" },
+                                    description: "Body parts mentioned (e.g., 'head', 'upper right thigh', 'left foot', 'stomach', 'chest', 'throat')"
+                                },
+                                body_part_phrases: {
+                                    type: "array",
+                                    items: { type: "string" },
+                                    description: "Full phrases where body parts are mentioned (e.g., 'pain in my chest', 'my left foot is swollen', 'pressure on upper right thigh')"
+                                },
+                                daily_mood: {
+                                    type: "string",
+                                    description: "Overall sentiment/mood in 2-5 words (e.g., 'worried and stressed', 'calm but tired', 'anxious about symptoms')"
+                                },
+                                estimated_health_metrics: {
+                                    type: "object",
+                                    description: "Physical health measurements mentioned or estimated (e.g. body temperature--(e.g. 98.6°F, fever, normal), blood pressure-- (e.g. 00, 120/80, high, normal), heart rate -- (e.g. 72 bpm, racing, normal)), any other physical measurements mentioned",
+                                }
+                            },
+                            required: ["pain_rating", "pain_phrases", "body_parts", "body_part_phrases", "daily_mood", "estimated_health_metrics"]
+                        }
+                    }
+                }
+            ],
+        });
+
+        // Extract the function call result
+        const toolCall = response.choices[0].message.tool_calls[0];
+        const extractedData = JSON.parse(toolCall.function.arguments);
+        
+        // Add metadata
+        const result = {
+            phoneNumber: phoneNumber,
+            timestamp: new Date().toISOString(),
+            ...extractedData
+        };
+        
+        console.log('Medical features extracted:', result);
+        
+        return result;
+        
+    } catch (error) {
+        console.error('Feature extraction failed:', error);
+        throw error;
     }
 }
 
 /**
  * Auto-schedule follow-up calls from conversation transcript
- * @param {string} transcript - Full conversation transcript
+ * @param {list} transcript - Full conversation transcript
  * @param {string} phoneNumber - Patient's phone number
  * @param {Function} scheduleFunction - scheduleRecurringCalls function from server.js
  */
 async function autoScheduleFromTranscript(transcript, phoneNumber, scheduleFunction) {
     try {
+        try {
+            transcript = transcript.join(" ")
+        }
+        catch (error) {
+            transcript = transcript
+        }
         console.log('Auto-scheduling for:', phoneNumber);
         
         // Call OpenAI to determine optimal schedule
@@ -131,12 +250,19 @@ async function autoScheduleFromTranscript(transcript, phoneNumber, scheduleFunct
     }
 }
 
+module.exports = {
+    generateFollowUpQuestion,
+    autoScheduleFromTranscript,
+    //extractKeywordsFromTranscript,
+    extractDBColumns
+};
+
 /**
  * Extract health/symptom keywords from a conversation transcript
  * @param {string} transcript - Full conversation transcript
  * @returns {Promise<string[]>} - Array of keyword strings
  */
-async function extractKeywordsFromTranscript(transcript) {
+/*async function extractKeywordsFromTranscript(transcript) {
     try {
         const response = await openai.chat.completions.create({
             model: "gpt-4o-mini",
@@ -164,49 +290,4 @@ async function extractKeywordsFromTranscript(transcript) {
         console.error('OpenAI keyword extraction error:', error);
         return [];
     }
-}
-
-/**
- * Analyze a full conversation transcript
- * @param {string} transcript - Full medical conversation transcript
- * @returns {Promise<object>} - Structured medical summary
- */
-async function analyzeTranscript(transcript) {
-    try {
-        const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-                {
-                    role: "system",
-                    content: `You are a medical transcription analyst. Extract key information from patient conversations.
-                    Return a JSON object with: symptoms, duration, severity, medical_history, medications, next_steps.`
-                },
-                {
-                    role: "user",
-                    content: `Analyze this medical conversation:\n\n${transcript}`
-                }
-            ],
-            max_tokens: 500,
-            temperature: 0.3
-        });
-
-        const analysis = response.choices[0].message.content.trim();
-        
-        // Try to parse as JSON, fallback to raw text
-        try {
-            return JSON.parse(analysis);
-        } catch {
-            return { summary: analysis };
-        }
-    } catch (error) {
-        console.error('OpenAI API Error:', error);
-        throw new Error('Failed to analyze transcript');
-    }
-}
-
-module.exports = {
-    generateFollowUpQuestion,
-    autoScheduleFromTranscript,
-    extractKeywordsFromTranscript
-    //analyzeTranscript
-};
+}*/

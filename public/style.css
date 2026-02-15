@@ -19,6 +19,7 @@ body {
     width: 100%;
     height: 100%;
     overflow: hidden;
+    pointer-events: none;
 }
 
 .wave {
@@ -26,6 +27,7 @@ body {
     width: 100%;
     height: 100%;
     opacity: 0.6;
+    pointer-events: none;
 }
 
 .wave1 {
@@ -303,4 +305,107 @@ input[type="tel"]:focus {
     transition: all 0.3s ease;
     border: none;
     box-shadow: 0 6px 16px rgba(130, 192, 216, 0.3);
+}
+
+.dashboard-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 80px 20px 20px;
+}
+
+.top-call {
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 15px;
+    padding: 20px 30px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    margin-bottom: 30px;
+    position: relative;
+    z-index: 10;
+}
+.calendar-container, .calls-list {
+    background: rgba(255, 255, 255, 0.8);  /*rgba(240, 248, 252, 0.8);*/
+    border-radius: 15px;
+    padding: 30px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    margin-bottom: 30px;
+    position: relative;
+    z-index: 10;
+}
+
+.calls-list h2 {
+    margin: 0 0 20px 0;
+    color: #333;
+    font-size: 24px;
+}
+
+/* Calendar customization */
+.fc .fc-button-primary,
+.fc .fc-button-primary:hover,
+.fc .fc-button-primary.fc-button-active {
+    background: #5B9AAD;
+    border-color: #5B9AAD;
+}
+.fc .fc-day-today {
+    background:#b8dce8 !important; /*rgba(91, 154, 173, 0.15) !important;*/
+}
+.fc-timeGridWeek-view .fc-day-today {
+    background: rgba(168, 213, 226, 0.2) !important;
+}
+.fc-event {
+    border: none;
+    border-radius: 5px;
+}
+
+/* Calls list */
+.call-item {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.call-info .phone {
+    font-weight: 600;
+    color: #333;
+}
+
+.call-info .schedule {
+    color: #666;
+    font-size: 14px;
+    margin-top: 5px;
+}
+
+.call-badge {
+    background: #5B9AAD;
+    color: white;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.no-calls {
+    text-align: center;
+    color: #999;
+    padding: 40px;
+}
+
+.back-btn {
+    padding: 10px 20px;
+    background: white;
+    color: #5B9AAD;
+    text-decoration: none;
+    border-radius: 10px;
+    font-weight: 600;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+
+.back-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
 }

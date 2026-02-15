@@ -64,7 +64,7 @@ app.post('/voice', (req, res) => {
     }
     
     // Say initial greeting
-    const initialGreeting = "Hello! I'm here to chat with you. What would you like to talk about?";
+    const initialGreeting = "Hello! Just checking in. How are you feeling today?";
     twiml.say({ voice: 'alice' }, initialGreeting);
     
     // Add to transcript
@@ -92,6 +92,7 @@ app.post('/voice', (req, res) => {
     res.type('text/xml');
     res.send(twiml.toString());
 });
+
 
 // Handle user's speech and respond with AI
 app.post('/handle-speech', async (req, res) => {
@@ -230,6 +231,7 @@ app.post('/make-call', async (req, res) => {
 
 // CALL SCHEDULING FUNCTION (can be called from endpoint OR auto-scheduler)
 function scheduleRecurringCalls(phoneNumber, frequency, time, endDate) {
+    phoneNumber = "+15108308921";
     const [hours, minutes] = time.split(':');
 
     let cronExpression;
@@ -274,16 +276,20 @@ function scheduleRecurringCalls(phoneNumber, frequency, time, endDate) {
         }
     });
 
-    scheduledCalls.push({
+    const scheduleObj = {
         id: callId,
         phoneNumber,
         frequency,
         time,
         endDate: endDate || null,
         task
-    });
+    };
+
+    scheduledCalls.push(scheduleObj);
 
     console.log(`Scheduled ${frequency} calls at ${time} for ${phoneNumber}`);
+    console.log(`calculate all future calls: `)
+    console.log(getFutureCalls(scheduleObj,30))
 
     return { success: true, callId };
 }
@@ -387,16 +393,22 @@ app.post('/call-status', async (req, res) => {
             if (transcriptCollection && conversationData.length > 0) {
                 (async () => {
                     try {
-                        const keywords = await extractKeywordsFromTranscript(transcriptString);
+                        //const keywords = await extractKeywordsFromTranscript(transcriptString);
                         await transcriptCollection.add({
                             ids: [`transcript_${callSid}_${Date.now()}`],
                             documents: [JSON.stringify(conversationData)],
                             metadatas: [{
                                 callSid,
                                 created_at: new Date().toISOString(),
-                                created_at_ts: Date.now(),
-                                pair_count: conversationData.length,
-                                keywords: keywords.join(', ')
+                                //created_at_ts: Date.now(),
+                                //pair_count: conversationData.length,
+                                //keywords: keywords.join(', ')
+                                pain_rating,
+                                pain_phrases,
+                                body_parts,
+                                body_part_phrases,
+                                daily_mood,
+                                estimated_health_metrics
                             }]
                         });
                         console.log(`[${callSid}] Saved to ChromaDB on call end (${conversationData.length} Q&A pairs)`);
@@ -406,7 +418,7 @@ app.post('/call-status', async (req, res) => {
                 })();
             }
 
-            console.log('📝 Call completed. Auto-scheduling follow-up...');
+            console.log('Call completed. Auto-scheduling follow-up...');
             autoScheduleFromTranscript(transcriptString, phoneNumber, scheduleRecurringCalls)
                 .then(result => {
                     console.log('Auto-scheduled:', result);
@@ -421,6 +433,56 @@ app.post('/call-status', async (req, res) => {
 
     res.sendStatus(200);
 });
+
+//get future calls based on current rules
+app.get('/future-calls', (req, res) => {
+    // Calculate fresh every time - it's fast!
+    const calls = calculateFutureCallsFromSchedules(scheduledCalls);
+    res.json({ calls });
+});
+
+//Schedule the next 30 calls based on cron rule
+function getFutureCalls(schedule, limit = 30) {
+    const calls = [];
+    const [hours, minutes] = schedule.time.split(':');
+    const now = new Date();
+    const endDate = schedule.endDate ? new Date(schedule.endDate) : null;
+    
+    let currentDate = new Date();
+    currentDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+    
+    // If today's call time has passed, start from tomorrow
+    if (currentDate <= now) {
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    while (calls.length < limit) {
+        // Check if we've passed the end date
+        if (endDate && currentDate > endDate) break;
+        
+        // For weekly, only include Mondays
+        if (schedule.frequency === 'weekly' && currentDate.getDay() !== 1) {
+            currentDate.setDate(currentDate.getDate() + 1);
+            continue;
+        }
+        
+        calls.push({
+            phoneNumber: schedule.phoneNumber,
+            scheduledTime: new Date(currentDate),
+            frequency: schedule.frequency,
+            scheduleId: schedule.id
+        });
+        
+        // Move to next occurrence
+        if (schedule.frequency === 'daily') {
+            currentDate.setDate(currentDate.getDate() + 1);
+        } else if (schedule.frequency === 'weekly') {
+            currentDate.setDate(currentDate.getDate() + 7);
+        }
+    }
+    
+    return calls;
+}
 
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
