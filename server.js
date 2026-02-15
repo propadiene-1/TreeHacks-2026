@@ -5,6 +5,7 @@ const { CloudClient } = require('chromadb');
 require('dotenv').config();
 
 const app = express();
+const port = 3000;
 
 const chroma = new CloudClient({
   apiKey: process.env.CHROMA_API_KEY,
