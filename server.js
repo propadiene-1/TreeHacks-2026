@@ -261,6 +261,10 @@ async function initChroma() {
   }
 }
 
+(async () => {
+    await initChroma();
+})();
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -532,6 +536,7 @@ function scheduleRecurringCalls(phoneNumber, frequency, time, endDate) {
   }
 
   const callId = `recurring-${Date.now()}`;
+  const dateScheduled = new Date();
 
     const task = cron.schedule(cronExpression, async () => {
         console.log(`Making recurring call to ${phoneNumber}`);
@@ -618,24 +623,24 @@ app.post('/call-status', async (req, res) => {
                 (async () => {
                     try {
                         //const keywords = await extractKeywordsFromTranscript(transcriptString);
+                        const { extractDBColumns } = require('./openai-calls');
+                        const features = await extractDBColumns(transcriptString, phoneNumber);
                         await transcriptCollection.add({
                             ids: [`transcript_${callSid}_${Date.now()}`],
-                            documents: [JSON.stringify(conversationData)],
+                            documents: [transcriptString],
                             metadatas: [{
                                 callSid,
+                                phoneNumber,
                                 created_at: new Date().toISOString(),
-                                //created_at_ts: Date.now(),
-                                //pair_count: conversationData.length,
-                                //keywords: keywords.join(', ')
-                                pain_rating,
-                                pain_phrases,
-                                body_parts,
-                                body_part_phrases,
-                                daily_mood,
-                                estimated_health_metrics
+                                pain_rating: features.pain_rating,
+                                pain_phrases: JSON.stringify(features.pain_phrases || []),
+                                body_parts: JSON.stringify(features.body_parts || []),
+                                body_part_phrases: JSON.stringify(features.body_part_phrases || []),
+                                daily_mood: features.daily_mood || '',
+                                estimated_health_metrics: JSON.stringify(features.estimated_health_metrics || {})
                             }]
                         });
-                        console.log(`[${callSid}] Saved to ChromaDB on call end (${conversationData.length} Q&A pairs)`);
+                        console.log(`[${callSid}] Saved to ChromaDB with extracted features`);
                     } catch (err) {
                         console.warn('ChromaDB save failed:', err.message);
                     }
@@ -644,15 +649,15 @@ app.post('/call-status', async (req, res) => {
 
             console.log('Call completed. Auto-scheduling follow-up...');
             autoScheduleFromTranscript(transcriptString, phoneNumber, scheduleRecurringCalls)
-                .then(result => {
-                    console.log('Auto-scheduled:', result);
-                })
+            .then(result => {
+                console.log('Auto-scheduled:', result);
+            })
                 .catch(error => {
-                    console.error('Auto-scheduling failed:', error.message);
-                });
-
-    conversations.delete(callSid);
-    mediaSessions.delete(callSid);
+                console.error('Auto-scheduling failed:', error.message);
+            });
+        conversations.delete(callSid);
+        mediaSessions.delete(callSid);
+    }
   }
 
   res.sendStatus(200);
