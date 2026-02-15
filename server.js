@@ -535,33 +535,50 @@ function scheduleRecurringCalls(phoneNumber, frequency, time, endDate) {
 
   const callId = `recurring-${Date.now()}`;
 
-  const task = cron.schedule(cronExpression, async () => {
-    if (endDate) {
-      const now = new Date();
-      const end = new Date(endDate);
-      if (now > end) {
-        task.stop();
-        const idx = scheduledCalls.findIndex(c => c.id === callId);
-        if (idx > -1) scheduledCalls.splice(idx, 1);
-        return;
-      }
-    }
+    const task = cron.schedule(cronExpression, async () => {
+        console.log(`Making recurring call to ${phoneNumber}`);
+        
+        // Stop all calls after end date
+        if (endDate) {
+            const now = new Date();
+            const end = new Date(endDate);
+            
+            if (now > end) {
+                console.log(`End date reached for ${phoneNumber}. Stopping calls.`);
+                task.stop();
+                
+                const index = scheduledCalls.findIndex(c => c.id === callId);
+                if (index > -1) scheduledCalls.splice(index, 1);
+                
+                return;
+            }
+        }
+        
+        try {
+            const result = await makeTwilioCall(phoneNumber);
+            console.log(`Recurring call initiated: ${result.callSid}`);
+        } catch (error) {
+            console.error(`Failed to make recurring call: ${error.message}`);
+        }
+    });
 
-    try {
-      await client.calls.create({
-        url: `${PUBLIC_BASE_URL}/voice`,
-        to: phoneNumber,
-        from: twilioPhoneNumber,
-        statusCallback: `${PUBLIC_BASE_URL}/call-status`,
-        statusCallbackEvent: ['completed']
-      });
-    } catch (e) {
-      console.error('Recurring call failed:', e.message);
-    }
-  });
+    const scheduleObj = {
+        id: callId,
+        phoneNumber,
+        frequency,
+        time,
+        endDate: endDate || null,
+        dateScheduled,
+        task
+    };
 
-  scheduledCalls.push({ id: callId, phoneNumber, frequency, time, endDate: endDate || null, task });
-  return { success: true, callId };
+    scheduledCalls.push(scheduleObj);
+
+    console.log(`Scheduled ${frequency} calls at ${time} for ${phoneNumber}`);
+
+    console.log(`Scheduled ${frequency} calls at ${time} for ${phoneNumber}`);
+
+    return { success: true, callId };
 }
 
 app.post('/schedule-recurring', (req, res) => {
