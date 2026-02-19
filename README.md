@@ -32,14 +32,14 @@ This project was made for TreeHacks 2026.
 
 3. **Set up API keys**
 
-   + **OpenAI API Key:** Visit [OpenAI](https://openai.com) and get your API key.
-   + **Chroma API Key:** Visit [Chroma Cloud](https://docs.trychroma.com/cloud/getting-started) and get your API key.
+   + Visit [OpenAI](https://openai.com) and get your API key.
+   + Visit [Chroma Cloud](https://docs.trychroma.com/cloud/getting-started) and get your API key.
 
 4. **Set up Twilio**
 
    + Make a [Twilio account](https://login.twilio.com/u/signup?state=hKFo2SAxMnVyT0ptaS1DTzlSMmhBMzJmWl9CLWpPVHhFMzVEdqFur3VuaXZlcnNhbC1sb2dpbqN0aWTZIFBhNmEyYWcxZEVLUTAzZmNPcnpTV2pxcHhvV2ZIeS14o2NpZNkgTW05M1lTTDVSclpmNzdobUlKZFI3QktZYjZPOXV1cks) and follow [these instructions](https://help.twilio.com/articles/223180048-How-to-Add-and-Remove-a-Verified-Phone-Number-or-Caller-ID-with-Twilio) to add phone numbers. 
-   + Add a source number (TWILIO_PHONE_NUMBER) which will act as the MedSec assistant.
-   + Add all the numbers you want MedSec to be able to call.
+   + Add a source number which MedSec will use to call you (TWILIO_PHONE_NUMBER).
+   + Add all client numbers that MedSec should call.
 
 5. **Set up environment variables**
 
