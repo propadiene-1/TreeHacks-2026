@@ -10,6 +10,8 @@ This project was made for TreeHacks 2026.
 
 ## Devpost: [devpost.com/software/th26](https://devpost.com/software/th26)
 
+![Alt text for the image](./archive/main_page.png)
+
 ## Highlights
 
 + **Long-term symptom tracking** --- through personalized follow-ups
