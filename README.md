@@ -2,11 +2,7 @@
 
 Your AI-powered medical assistant! 
 
-MedSec is an AI-powered medical assistant that operates entirely over the phone.
-
-Enter your number and MedSec will call you, ask about your pain, and create a check-up schedule. 
-
-Long-term, it will collect and analyze your symptoms-- including pain history, day-to-day health status, and any long-term patterns.
+Enter your number and MedSec will call you, ask about your pain, and create a check-up schedule. Long-term, it will collect and analyze your symptoms-- including pain history, day-to-day health status, and any long-term patterns.
 
 This project was made for TreeHacks 2026.
 
