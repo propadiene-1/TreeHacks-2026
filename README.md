@@ -8,17 +8,15 @@ Long-term, MedSec will collect and analyze your symptoms. You'll read about your
 
 This project was made for TreeHacks 2026.
 
+## Devpost: [devpost.com/software/th26](https://devpost.com/software/th26)
+
 ## Highlights
 
-+ **Long-term symptom tracking** -- through personalized follow-ups
-
-+ **Agentic scheduling pipeline** -- automatically creates a check-in schedule based on your first meeting
-
-+ **Live biomarker analysis** -- tracking shaky voice, pauses, tone, etc.
-
-+ **Custom pain recalibration** -- adjusts for long-term habituation
-
-+ **Clean & intuitive UI** -- just add your number!
++ **Long-term symptom tracking** (through personalized follow-ups)
++ **Agentic scheduling pipeline** (internally creates a check-in schedule based on your first meeting)
++ **Live biomarker analysis** (tracks shaky voice, pauses, tone, etc.)
++ **Custom pain recalibration** (adjusts for daily physical changes & long-term habituation)
++ **Clean & intuitive UI** (just add your number!)
 
 ## Quick Start
 
@@ -97,9 +95,6 @@ TreeHacks-2026/
 ```
 ## Authors
 - Isita B.
-
 - Ashita B.
-
 - Nishka K.
-
 - Aileen L.
