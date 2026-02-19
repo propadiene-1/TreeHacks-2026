@@ -12,11 +12,11 @@ This project was made for TreeHacks 2026.
 
 ## Highlights
 
-+ **Long-term symptom tracking** (through personalized follow-ups)
-+ **Agentic scheduling pipeline** (internally creates a check-in schedule based on your first meeting)
-+ **Live biomarker analysis** (tracks shaky voice, pauses, tone, etc.)
-+ **Custom pain recalibration** (adjusts for daily physical changes & long-term habituation)
-+ **Clean & intuitive UI** (just add your number!)
++ **Long-term symptom tracking** --- through personalized follow-ups
++ **Agentic scheduling pipeline** --- internally creates a check-in schedule based on your first meeting
++ **Live biomarker analysis** --- tracks shaky voice, pauses, tone, etc.
++ **Custom pain recalibration** --- adjusts for daily physical changes & long-term habituation
++ **Clean & intuitive UI** --- just add your number!
 
 ## Quick Start
 
