@@ -1,8 +1,24 @@
-# MedSek (TreeHacks 2026)
+# MedSec (TreeHacks 2026)
 
-AI-powered medical assistant!
+Your AI-powered medical assistant! 
 
-This was made for TreeHacks 2026.
+MedSec is an AI-powered medical assistant that operates entirely on the phone. Enter your number and it will call you, ask about your pain, and check up on you over the next few weeks.
+
+Long-term, MedSec will collect and analyze your symptoms. You'll read about your pain history, day-to-day health status, and any long-term patterns.
+
+This project was made for TreeHacks 2026.
+
+## Highlights
+
++ **Long-term symptom tracking** -- through personalized follow-ups
+
++ **Agentic scheduling pipeline** -- automatically creates a check-in schedule based on your first meeting
+
++ **Live biomarker analysis** -- tracking shaky voice, pauses, tone, etc.
+
++ **Custom pain recalibration** -- adjusts for long-term habituation
+
++ **Clean & intuitive UI** -- just add your number!
 
 ## Quick Start
 
@@ -16,20 +32,37 @@ This was made for TreeHacks 2026.
    npm install
    ```
 
-3. **Set up environment variables**
-    + Create a file called `.env` file in the root directory:
+3. **Set up API keys**
+
+   + **OpenAI API Key:** Visit [OpenAI](https://openai.com) and get your API key.
+   + **Chroma API Key:** Visit [Chroma Cloud](https://docs.trychroma.com/cloud/getting-started) and get your API key.
+
+4. **Set up Twilio**
+
+   + Make a [Twilio account](https://login.twilio.com/u/signup?state=hKFo2SAxMnVyT0ptaS1DTzlSMmhBMzJmWl9CLWpPVHhFMzVEdqFur3VuaXZlcnNhbC1sb2dpbqN0aWTZIFBhNmEyYWcxZEVLUTAzZmNPcnpTV2pxcHhvV2ZIeS14o2NpZNkgTW05M1lTTDVSclpmNzdobUlKZFI3QktZYjZPOXV1cks) and follow [these instructions](https://help.twilio.com/articles/223180048-How-to-Add-and-Remove-a-Verified-Phone-Number-or-Caller-ID-with-Twilio) to add phone numbers. 
+   + Add a source number (TWILIO_PHONE_NUMBER) which will act as the MedSec assistant.
+   + Add all the numbers you want MedSec to be able to call.
+
+5. **Set up environment variables**
+
+   Create a file called `.env` file in the root directory:
+
     ```env
-    # Server Configuration
-    PORT=4000
+   OPENAI_API_KEY=[YOUR API KEY]
+   PORT=3000
+   TWILIO_ACCOUNT_SID = [YOUR ACCOUNT SID]
+   TWILIO_AUTH_TOKEN = [YOUR AUTH TOKEN]
+   TWILIO_PHONE_NUMBER = [SOURCE PHONE NUMBER]
+   CHROMA_API_KEY= [YOUR API KEY]
+   CHROMA_TENANT= [YOUR TENANT CODE]
+   SERVER_URL= [YOUR SERVER URL]
     ```
 
-4. **Set up API keys**
+6. **Set up ngrok (instructions [here](http://ngrok.com/docs/getting-started)).**
 
-   **OpenAI API Key:**
-   - Visit [OpenAI](https://openai.com) and get your API key
-   - Paste your API key (starts with "sk-") as OPENAI_API_KEY=[YOUR API KEY]
+   Start ngrok before running the app.
 
-5. **Run the app**
+7. **Run the app**
     ```bash
     npm start
     ```
@@ -41,7 +74,7 @@ This was made for TreeHacks 2026.
 - **Natural Language**: OpenAI GPT-4o (conversational AI + function calling)
 - **Vector DB**: ChromaDB (semantic search)
 - **Scheduling**: node-cron with adaptive recurrence logic
-- **Analytics**: Custom pain recalibration detection
+- **Analytics**: Custom pain recalibration algorithm + biomarker analysis
 - **Frontend**: HTML, JavaScript, CSS
 
 ## Project Structure
@@ -51,16 +84,22 @@ TreeHacks-2026/
 ├── public/                 # frontend
 │   ├── index.html        # main page
 │   │   dashboard.html        # user data
+|   |   schedule.html       #schedule page
+|   |   schedule.js         
 │   │   script.js           # frontend functions
 |   |   style.css           # UI
 ├── package.json            # dependencies
-|   openai-calls.js         #api calls
-|   server.js               #backend logic
-├── .env                   # environment variablees
+|   server.js               # backend logic
+├── openai-calls.js         # api calls
+|   pain-correction.js     # pain correction algorithm
+├── .env                   # environment variables
 └── README.md
 ```
 ## Authors
-- Isita
-- Ashita
-- Nishka
-- Aileen
+- Isita B.
+
+- Ashita B.
+
+- Nishka K.
+
+- Aileen L.

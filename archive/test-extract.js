@@ -1,4 +1,4 @@
-const { extractDBColumns } = require('./openai-calls');
+const { extractDBColumns } = require('../openai-calls');
 
 // More ambiguous, realistic transcripts
 const testCases = [
