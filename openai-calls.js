@@ -57,17 +57,6 @@ ${symptomContext}
     }
 }
 
-
-async function extractDBColumns(transcript, phoneNumber) {
-    try {
-        transcript = transcript.join(" ")
-        
-    } catch (error) {
-        console.error('Auto-scheduling failed:', error);
-        throw error;
-    }
-}
-
 /**
  * Extract structured medical data from transcript
  * @param {Array|string} transcript - Full conversation transcript

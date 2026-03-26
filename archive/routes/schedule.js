@@ -64,7 +64,7 @@ app.post('/make-call', async (req, res) => {
 
 // Schedule recurring calls (30 seconds = 1 day for testing)
 function scheduleRecurringCalls(phoneNumber, frequency, time, endDate) {
-    phoneNumber = "+15108308921";
+    //phoneNumber = "+15108308921";
     const callId = `recurring-${Date.now()}`;
     
     // Convert frequency to seconds (1 day = 30 seconds)

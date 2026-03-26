@@ -1,19 +1,19 @@
 /**
- * Combined Pain Correction Algorithm
- * Habituation-dominant model (chronic adaptation > acute mood effects)
+ * Pain correction algorithm
+ * Habituation-dominant model (includes chronic adaptation & acute mood effects)
  */
 
 const CORRECTION_PARAMS = {
-  // Mood/physical bias (over-reporting) - REDUCED for acute effect
+  // mood/physical bias (over-reporting) - reduced for acute effect
   kMood: 0.08,
   kPhysical: 0.08,
   
-  // Habituation correction (under-reporting) - INCREASED for chronic effect
+  // habituation correction (under-reporting) - increased for chronic effect
   peakMonths: 15,
-  maxHabituationFraction: 0.45,  // Up to 45% of baseline pain
+  maxHabituationFraction: 0.45,  // up to 45% of baseline pain
   minChronicBaseline: 4,
   driftThreshold: 1.5,
-  correctionWeight: 0.8          // More aggressive correction
+  correctionWeight: 0.8          // aggressive correction
 };
 
 function moodPhysicalBias(mood, physicalCondition) {
